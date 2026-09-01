@@ -1,0 +1,17 @@
+<Window x:Class="TaskbarMediaWidget.Taskbar.TaskbarWidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:TaskbarMediaWidget.Controls"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        Topmost="True"
+        SizeToContent="Manual"
+        Width="1"
+        Height="1"
+        Focusable="False"
+        WindowStartupLocation="Manual">
+    <controls:NowPlayingWidgetControl x:Name="Widget" />
+</Window>

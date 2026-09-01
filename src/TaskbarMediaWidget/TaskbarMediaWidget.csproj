@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22000.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>TaskbarMediaWidget</RootNamespace>
+    <StartupObject>TaskbarMediaWidget.App</StartupObject>
+    <AssemblyName>TaskbarMediaWidget</AssemblyName>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dubya.WindowsMediaController" Version="2.5.6" />
+  </ItemGroup>
+
+  <!--
+    UIAutomationClient/UIAutomationTypes (used to locate the Start/Widgets/taskbar-frame elements)
+    are already pulled in implicitly by UseWPF — no explicit <Reference> needed, and adding one
+    caused an unresolved-duplicate-reference warning.
+  -->
+</Project>
