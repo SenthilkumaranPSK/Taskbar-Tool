@@ -99,6 +99,15 @@ public partial class TaskbarWidgetWindow : Window
 
         WindowStyleHelper.MakeChildWindow(_hwnd);
         NativeMethods.SetParent(_hwnd, _taskbarHandle);
+
+        // SetParent's return value can't reliably indicate failure (NULL is also the correct
+        // return for a window with no previous parent), so verify by reading the parent back.
+        if (NativeMethods.GetParent(_hwnd) != _taskbarHandle)
+        {
+            AppLog.Warn("SetParent did not attach the widget to the taskbar; will retry on next poll.");
+            return;
+        }
+
         _isSetUp = true;
         AppLog.Info("Attached widget window to taskbar.");
     }

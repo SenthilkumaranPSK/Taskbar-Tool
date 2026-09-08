@@ -14,12 +14,21 @@ namespace TaskbarMediaWidget.Media;
 internal sealed class MediaSessionService : IDisposable
 {
     private readonly MediaManager _mediaManager = new();
-    private MediaSession? _activeSession;
+    private volatile NowPlayingInfo? _currentNowPlaying;
 
     public event Action<NowPlayingInfo?>? NowPlayingChanged;
 
+    /// <summary>
+    /// The most recently published now-playing snapshot (or null), for a freshly (re)created
+    /// widget window to pick up immediately instead of waiting for the next SMTC event — this
+    /// matters after an Explorer restart, where the old window's HWND is gone and a new one has
+    /// nothing to show until something happens to trigger a fresh SMTC callback.
+    /// </summary>
+    public NowPlayingInfo? CurrentNowPlaying => _currentNowPlaying;
+
     public void Start()
     {
+        _mediaManager.OnAnySessionOpened += OnAnySessionOpened;
         _mediaManager.OnAnyMediaPropertyChanged += OnAnyMediaPropertyChanged;
         _mediaManager.OnAnyPlaybackStateChanged += OnAnyPlaybackStateChanged;
         _mediaManager.OnAnySessionClosed += OnAnySessionClosed;
@@ -50,6 +59,8 @@ internal sealed class MediaSessionService : IDisposable
         }
     }
 
+    private void OnAnySessionOpened(MediaSession mediaSession) => _ = RefreshAsync();
+
     private void OnAnyMediaPropertyChanged(MediaSession mediaSession, Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties) =>
         _ = RefreshAsync();
 
@@ -60,8 +71,8 @@ internal sealed class MediaSessionService : IDisposable
 
     /// <summary>
     /// Session selection, simplest-first: prefer the session the OS considers "focused," else
-    /// the most recently-changed session that's actually Playing, else just the first available
-    /// session, else null (nothing playing anywhere — widget should collapse).
+    /// the first session that's actually Playing, else just the first available session, else
+    /// null (nothing playing anywhere — widget should collapse).
     /// </summary>
     private MediaSession? GetActiveSession()
     {
@@ -88,8 +99,8 @@ internal sealed class MediaSessionService : IDisposable
     {
         try
         {
-            _activeSession = GetActiveSession();
-            var info = await BuildNowPlayingInfoAsync(_activeSession);
+            var info = await BuildNowPlayingInfoAsync(GetActiveSession());
+            _currentNowPlaying = info;
             NowPlayingChanged?.Invoke(info);
         }
         catch (Exception ex)
@@ -138,6 +149,7 @@ internal sealed class MediaSessionService : IDisposable
 
     public void Dispose()
     {
+        _mediaManager.OnAnySessionOpened -= OnAnySessionOpened;
         _mediaManager.OnAnyMediaPropertyChanged -= OnAnyMediaPropertyChanged;
         _mediaManager.OnAnyPlaybackStateChanged -= OnAnyPlaybackStateChanged;
         _mediaManager.OnAnySessionClosed -= OnAnySessionClosed;

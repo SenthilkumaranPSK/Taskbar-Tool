@@ -10,11 +10,12 @@ This is a from-scratch reimplementation, inspired by (but not copied from — se
 
 ## Build & run
 
-- **Build**: `dotnet build Taskbar-Tool.slnx`
+- **Build**: `dotnet build Taskbar-Tool.slnx` — note the `.slnx` extension: this is the new XML-based solution format the .NET 10 SDK generates by default (`dotnet new sln`), not a classic `.sln` file.
 - **Run**: `dotnet run --project src/TaskbarMediaWidget/TaskbarMediaWidget.csproj` (or launch from Visual Studio with `TaskbarMediaWidget` as startup project)
 - **No test project** — this is fundamentally not unit-testable; verification is manual (see below).
 - Single instance enforced via a named mutex (`Core/SingleInstanceGuard.cs`) — running a second copy just exits immediately.
 - Target framework: `net10.0-windows10.0.22000.0` (matches installed SDK 10.0.103; the `10.0.22000.0` suffix is required for the SMTC WinRT APIs).
+- Project targets both `x64` and `ARM64` (`Platforms`/`RuntimeIdentifiers` in the `.csproj`) — a plain `dotnet build` uses the default platform, so pass `-p:Platform=ARM64` (or `-r win-arm64`) when you need to verify the ARM64 path specifically.
 
 ## Architecture
 
@@ -22,13 +23,13 @@ This is a from-scratch reimplementation, inspired by (but not copied from — se
 
 `Taskbar/TaskbarWidgetWindow.xaml.cs` is a WPF window that gets turned into a genuine `WS_CHILD` of the taskbar's own HWND (`Shell_TrayWnd`) via `SetParent` — not an always-on-top overlay. Once reparented, WPF's own `Window.Left`/`Top` no longer apply; position and size are driven entirely by raw `SetWindowPos` calls (`Interop/NativeMethods.cs`) in the taskbar's client coordinate space. A ~1.3s poll timer continuously re-resolves the taskbar handle and re-applies position (self-healing, not purely event-driven), and explicit hooks handle `WM_DPICHANGED`/`WM_DISPLAYCHANGE`/`WM_SETTINGCHANGE` for scale/resolution changes.
 
-**Explorer restarts require full window recreation, not revival**: `DestroyWindow` on a parent also destroys true `WS_CHILD` children, so when `explorer.exe` dies, the reparented widget HWND is destroyed as a side effect and cannot be reused. `TaskbarWidgetWindow` detects this via `WM_TASKBARCREATED`, waits for the taskbar to come back (`HandleExplorerRestartAsync`), then raises `ExplorerRestarted` — `App.xaml.cs.RecreateWidgetWindow()` closes the dead instance and constructs a fresh one. Don't try to "fix" this by re-`SetParent`-ing the same instance; it won't work.
+**Explorer restarts require full window recreation, not revival**: `DestroyWindow` on a parent also destroys true `WS_CHILD` children, so when `explorer.exe` dies, the reparented widget HWND is destroyed as a side effect and cannot be reused. `TaskbarWidgetWindow` detects this via `WM_TASKBARCREATED`, waits for the taskbar to come back (`HandleExplorerRestartAsync`), then raises `ExplorerRestarted` — `App.xaml.cs.RecreateWidgetWindow()` closes the dead instance and constructs a fresh one. Don't try to "fix" this by re-`SetParent`-ing the same instance; it won't work. Because the new window starts with no now-playing state of its own, `App.xaml.cs.CreateWidgetWindow()` immediately hydrates it from `MediaSessionService.CurrentNowPlaying` (the last snapshot `RefreshAsync` published) right after `Show()` — otherwise the recreated widget would stay collapsed until the next incidental SMTC callback instead of reflecting whatever was already playing.
 
 Full background and the Win32 API surface this is built on: `docs/reference-fluentflyout-taskbar-widget.md`.
 
-### Positioning next to the Start button — unverified, needs on-device tuning
+### Positioning next to the Start button — confirmed on one machine, still needs broader on-device tuning
 
-`Taskbar/StartButtonLocator.cs` is the one piece of this app with no working prior art (FluentFlyout never looks up the Start button itself). It tries UI Automation first (`AutomationId="StartButton"` — **an educated guess, not confirmed**), sanity-checks the result against plausible bounds, and falls back to a fixed DPI-scaled pixel offset **only when the taskbar is Left-aligned** (checked via the `TaskbarAl` registry value) — a fixed offset would be visibly wrong when Center-aligned (the Windows 11 default), so that case intentionally hides the widget rather than guessing.
+`Taskbar/StartButtonLocator.cs` is the one piece of this app with no working prior art (FluentFlyout never looks up the Start button itself). It tries UI Automation first (`AutomationId="StartButton"` — confirmed to resolve on a Windows 11 build 10.0.26200 dev machine, but that's one build/config, not a guarantee across all Windows 11 versions), sanity-checks the result against plausible bounds, and falls back to a fixed DPI-scaled pixel offset **only when the taskbar is Left-aligned** (checked via the `TaskbarAl` registry value) — a fixed offset would be visibly wrong when Center-aligned (the Windows 11 default), so that case intentionally hides the widget rather than guessing. The resolved element is cached (mirroring `TaskbarLocator`'s taskbar-frame cache) so the ~1.3s poll only re-reads a bounding rectangle, not a full UI Automation tree search, on most ticks.
 
 **Before relying on this in daily use**: check `%LocalAppData%\TaskbarMediaWidget\log.txt` for `"StartButton automation id did not resolve"` or `"failed sanity check"` warnings, and confirm/replace `StartButtonAutomationId` and `FallbackStartButtonWidthLogicalPx` (both marked `TODO(verify/measure on-device)` in `StartButtonLocator.cs`) against the real taskbar.
 
@@ -47,6 +48,7 @@ No MVVM framework — plain C# events, wired directly in `App.xaml.cs`: `MediaSe
 - `SetWindowPos` in `Interop/NativeMethods.cs` must stay a classic `[DllImport]`, not a `[LibraryImport]` source-generated binding — the source-generated version has been observed to break topmost/visibility behavior for a window reparented into another process.
 - `UseWindowsForms=true` (needed only for the tray icon) plus `UseWPF=true` means `Application`, `UserControl`, and `Size` are ambiguous between `System.Windows.*` and `System.Windows.Forms`/`System.Drawing` — fully qualify these where the compiler flags CS0104 rather than adding blanket `using` aliases.
 - DPI awareness is declared via the `<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>` project property (not `app.manifest` directly) — WinForms' own DPI configuration conflicts with a hand-written manifest DPI block when both toolkits are in the same project (`WFO0003`). This is required, not optional: the positioning math reads DPI straight off the taskbar HWND via `GetDpiForWindow`.
+- Shared app-level helpers (logging, single-instance guard) live under the `Core/` namespace, not `App/` — a namespace named `TaskbarMediaWidget.App` collides with the `App` class itself (`TaskbarMediaWidget.App`, the `Application` subclass) and fails to compile. Don't reintroduce an `App/` folder for anything other than `App.xaml`/`App.xaml.cs`.
 
 ## Verification
 

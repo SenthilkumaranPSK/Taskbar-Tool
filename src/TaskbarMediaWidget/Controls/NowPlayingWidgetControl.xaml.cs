@@ -9,6 +9,9 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 {
     private const double ScrollPixelsPerSecond = 30;
 
+    private string? _lastTitle;
+    private string? _lastArtist;
+
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
@@ -24,12 +27,17 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         if (info is null)
         {
             Visibility = Visibility.Collapsed;
+            _lastTitle = null;
+            _lastArtist = null;
             return;
         }
 
         Visibility = Visibility.Visible;
 
-        TitleText.Text = string.IsNullOrWhiteSpace(info.Title) ? "Not playing" : info.Title;
+        var title = string.IsNullOrWhiteSpace(info.Title) ? "Not playing" : info.Title;
+        var isNewTrack = title != _lastTitle || info.Artist != _lastArtist;
+
+        TitleText.Text = title;
         ArtistText.Text = info.Artist;
         CoverArt.Source = info.Thumbnail;
 
@@ -38,7 +46,14 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         PlayPauseButton.IsEnabled = info.IsPlayPauseEnabled;
         PlayPauseButton.Content = info.IsPlaying ? "⏸" : "▶";
 
-        RestartMarqueeIfNeeded();
+        // Only reset/restart the scrolling marquee when the track actually changed — otherwise a
+        // play/pause toggle (which also raises SetNowPlaying) yanks mid-scroll text back to 0.
+        if (isNewTrack)
+        {
+            _lastTitle = title;
+            _lastArtist = info.Artist;
+            RestartMarqueeIfNeeded();
+        }
     }
 
     /// <summary>Natural width of the widget's content, for the host window to size itself to.</summary>

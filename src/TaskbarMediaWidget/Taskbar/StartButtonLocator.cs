@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using System.Windows.Automation;
 using TaskbarMediaWidget.Core;
 using TaskbarMediaWidget.Interop;
 
@@ -16,10 +17,11 @@ public enum TaskbarAlignment
 /// prior art to lean on (FluentFlyout never looks up the Start button — see
 /// docs/reference-fluentflyout-taskbar-widget.md) and it needs on-machine verification:
 ///
-///   - The automation ID guessed below ("StartButton") is UNVERIFIED. If it doesn't resolve,
-///     every lookup silently falls through to the fallback path — check the log
-///     (%LocalAppData%\TaskbarMediaWidget\log.txt) for "StartButton automation id did not
-///     resolve" to find out whether that's happening on your machine.
+///   - The automation ID guessed below ("StartButton") resolved successfully on a Windows 11
+///     (build 10.0.26200) dev machine, but that's one build/config, not a guarantee — if it
+///     doesn't resolve on yours, every lookup silently falls through to the fallback path; check
+///     the log (%LocalAppData%\TaskbarMediaWidget\log.txt) for "StartButton automation id did
+///     not resolve" to find out whether that's happening on your machine.
 ///   - FallbackStartButtonWidthLogicalPx below is a placeholder and MUST be measured on the
 ///     real target machine (e.g. a screenshot + pixel ruler) before relying on the fallback path.
 /// </summary>
@@ -35,6 +37,15 @@ internal static class StartButtonLocator
 
     private const double MinPlausibleWidthLogicalPx = 32;
     private const double MaxPlausibleWidthLogicalPx = 80;
+
+    // Caches the resolved Start button element the same way TaskbarLocator caches the taskbar
+    // frame: a UI Automation FindFirst tree walk is the expensive part of this lookup, and the
+    // caller re-invokes GetWidgetStartX on every ~1.3s poll tick (and on every DPI/display-change
+    // message) on the UI dispatcher thread. Re-walking the tree every tick would mean a bounded
+    // but still blocking Task.Run+Wait on the UI thread each time; re-reading BoundingRectangle
+    // on an already-resolved element is a single cheap property fetch instead.
+    private static AutomationElement? _cachedStartButton;
+    private static IntPtr _cachedForHwnd;
 
     /// <summary>
     /// Returns the X coordinate (taskbar client space, physical px) where the widget should
@@ -54,10 +65,9 @@ internal static class StartButtonLocator
 
     private static int? TryGetFromAutomation(IntPtr taskbarHandle, NativeMethods.RECT taskbarRectScreen, double dpiScale)
     {
-        var element = AutomationLookup.TryFindByAutomationId(taskbarHandle, StartButtonAutomationId, timeoutMs: 1000);
+        var element = TryGetCachedOrFreshStartButton(taskbarHandle);
         if (element is null)
         {
-            AppLog.Warn($"StartButton automation id '{StartButtonAutomationId}' did not resolve; using fallback offset.");
             return null;
         }
 
@@ -95,10 +105,40 @@ internal static class StartButtonLocator
             NativeMethods.ScreenToClient(taskbarHandle, ref screenPoint);
             return screenPoint.X;
         }
-        catch (System.Windows.Automation.ElementNotAvailableException)
+        catch (ElementNotAvailableException)
         {
+            _cachedStartButton = null;
             return null;
         }
+    }
+
+    private static AutomationElement? TryGetCachedOrFreshStartButton(IntPtr taskbarHandle)
+    {
+        if (_cachedStartButton != null && _cachedForHwnd == taskbarHandle)
+        {
+            try
+            {
+                _ = _cachedStartButton.Current.BoundingRectangle; // touch it to force staleness check
+                return _cachedStartButton;
+            }
+            catch (ElementNotAvailableException)
+            {
+                _cachedStartButton = null;
+            }
+        }
+
+        var found = AutomationLookup.TryFindByAutomationId(taskbarHandle, StartButtonAutomationId, timeoutMs: 1000);
+        if (found != null)
+        {
+            _cachedStartButton = found;
+            _cachedForHwnd = taskbarHandle;
+        }
+        else
+        {
+            AppLog.Warn($"StartButton automation id '{StartButtonAutomationId}' did not resolve; using fallback offset.");
+        }
+
+        return found;
     }
 
     private static int? TryGetFromFallback(NativeMethods.RECT taskbarRectScreen, double dpiScale)

@@ -58,6 +58,10 @@ public partial class App : System.Windows.Application
         }
 
         _widgetWindow.Show();
+
+        // Pick up whatever was already playing rather than waiting for the next SMTC event —
+        // matters most right after an Explorer restart, where this is a brand-new window.
+        _widgetWindow.UpdateNowPlaying(_mediaSessionService?.CurrentNowPlaying);
     }
 
     private void RecreateWidgetWindow()
