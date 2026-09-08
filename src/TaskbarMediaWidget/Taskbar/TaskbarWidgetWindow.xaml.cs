@@ -134,6 +134,12 @@ public partial class TaskbarWidgetWindow : Window
         CalculateAndSetPosition();
     }
 
+    // Anchored to the taskbar's own left edge, independent of the Start button — chosen over
+    // docking next to Start because Start sits in the middle of the screen on a Center-aligned
+    // taskbar (the Windows 11 default), and this widget is meant to always be reachable at the
+    // same spot regardless of taskbar alignment or how many icons are pinned.
+    private const double LeftEdgeMarginLogicalPx = 6;
+
     private void CalculateAndSetPosition()
     {
         if (_taskbarHandle == IntPtr.Zero || Widget.Visibility != Visibility.Visible)
@@ -148,15 +154,7 @@ public partial class TaskbarWidgetWindow : Window
         Width = naturalSize.Width;
         Height = naturalSize.Height;
 
-        var startX = StartButtonLocator.GetWidgetStartX(_taskbarHandle, taskbarRect, dpiScale);
-        if (startX is null)
-        {
-            // Nowhere sane to put it (see StartButtonLocator remarks) — better to stay hidden
-            // than visibly misplaced.
-            SetWindowVisible(false);
-            return;
-        }
-
+        var startX = (int)Math.Round(LeftEdgeMarginLogicalPx * dpiScale);
         var physicalWidth = (int)Math.Round(naturalSize.Width * dpiScale);
         var physicalHeight = (int)Math.Round(naturalSize.Height * dpiScale);
         var y = (int)Math.Round((taskbarRect.Height - physicalHeight) / 2.0);
@@ -164,7 +162,7 @@ public partial class TaskbarWidgetWindow : Window
         NativeMethods.SetWindowPos(
             _hwnd,
             IntPtr.Zero,
-            startX.Value,
+            startX,
             y,
             physicalWidth,
             physicalHeight,

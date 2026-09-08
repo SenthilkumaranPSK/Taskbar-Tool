@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-TaskbarMediaWidget is a Windows 11 WPF app with a single purpose: show a compact "now playing" media widget genuinely embedded in the real Windows taskbar (not a floating overlay), positioned immediately to the right of the Start button. It reflects whatever app is currently playing media via the OS-level System Media Transport Controls (SMTC) — Spotify, browser tabs, YouTube Music, etc.
+TaskbarMediaWidget is a Windows 11 WPF app with a single purpose: show a compact "now playing" media widget genuinely embedded in the real Windows taskbar (not a floating overlay), anchored to the taskbar's left edge. It reflects whatever app is currently playing media via the OS-level System Media Transport Controls (SMTC) — Spotify, browser tabs, YouTube Music, etc.
 
-This is a from-scratch reimplementation, inspired by (but not copied from — see licensing note below) [FluentFlyout](https://github.com/unchihugo/FluentFlyout)'s taskbar-widget feature, which was studied as reference and is summarized in `docs/reference-fluentflyout-taskbar-widget.md`. Deliberately out of scope: flyouts, volume mixer, lock-key indicators, audio visualizer, MSIX/Store packaging, licensing gates, localization, settings UI. If a feature isn't "show now-playing info docked next to Start," it doesn't belong here.
+This is a from-scratch reimplementation, inspired by (but not copied from — see licensing note below) [FluentFlyout](https://github.com/unchihugo/FluentFlyout)'s taskbar-widget feature, which was studied as reference and is summarized in `docs/reference-fluentflyout-taskbar-widget.md`. Deliberately out of scope: flyouts, volume mixer, lock-key indicators, audio visualizer, MSIX/Store packaging, licensing gates, localization, settings UI. If a feature isn't "show now-playing info docked in the taskbar," it doesn't belong here.
 
 ## Build & run
 
@@ -27,11 +27,9 @@ This is a from-scratch reimplementation, inspired by (but not copied from — se
 
 Full background and the Win32 API surface this is built on: `docs/reference-fluentflyout-taskbar-widget.md`.
 
-### Positioning next to the Start button — confirmed on one machine, still needs broader on-device tuning
+### Positioning: anchored to the taskbar's left edge, not the Start button
 
-`Taskbar/StartButtonLocator.cs` is the one piece of this app with no working prior art (FluentFlyout never looks up the Start button itself). It tries UI Automation first (`AutomationId="StartButton"` — confirmed to resolve on a Windows 11 build 10.0.26200 dev machine, but that's one build/config, not a guarantee across all Windows 11 versions), sanity-checks the result against plausible bounds, and falls back to a fixed DPI-scaled pixel offset **only when the taskbar is Left-aligned** (checked via the `TaskbarAl` registry value) — a fixed offset would be visibly wrong when Center-aligned (the Windows 11 default), so that case intentionally hides the widget rather than guessing. The resolved element is cached (mirroring `TaskbarLocator`'s taskbar-frame cache) so the ~1.3s poll only re-reads a bounding rectangle, not a full UI Automation tree search, on most ticks.
-
-**Before relying on this in daily use**: check `%LocalAppData%\TaskbarMediaWidget\log.txt` for `"StartButton automation id did not resolve"` or `"failed sanity check"` warnings, and confirm/replace `StartButtonAutomationId` and `FallbackStartButtonWidthLogicalPx` (both marked `TODO(verify/measure on-device)` in `StartButtonLocator.cs`) against the real taskbar.
+An earlier version tried to dock the widget immediately right of the Start button via UI Automation (`AutomationId="StartButton"`), with a registry-alignment-aware pixel fallback. That was dropped: on a Center-aligned taskbar (the Windows 11 default), Start sits in the middle of the screen, so "next to Start" put the widget in the middle of the screen too, mixed in with pinned/running app icons — not the fixed, predictable spot the widget is meant to occupy. `TaskbarWidgetWindow.CalculateAndSetPosition` now just places it at a small fixed margin (`LeftEdgeMarginLogicalPx`) from the taskbar's own left edge (from `TaskbarLocator.GetTaskbarRect`), independent of Start's position or the taskbar's alignment setting. This means on a Left-aligned taskbar the widget can visually collide with the Start button itself — acceptable for this app's current single target configuration (Center-aligned), not yet handled for Left-aligned setups.
 
 ### Media session data
 
@@ -54,9 +52,9 @@ No MVVM framework — plain C# events, wired directly in `App.xaml.cs`: `MediaSe
 
 No automated tests are meaningful here — this is live interaction with `explorer.exe`'s real window tree. After building, check manually:
 
-1. Play media somewhere, confirm the widget appears touching the taskbar next to Start.
+1. Play media somewhere, confirm the widget appears touching the taskbar's left edge.
 2. Confirm true embedding (not overlay): drag a maximized window over the taskbar — the widget should get clipped like a native taskbar element, and never appear in Alt-Tab.
-3. Toggle **Settings → Personalization → Taskbar → alignment** between Left and Center — confirm behavior matches the design in `StartButtonLocator.cs` (positioned correctly on Left; gracefully hidden rather than misplaced on Center if automation fails).
+3. Toggle **Settings → Personalization → Taskbar → alignment** between Left and Center — the widget stays pinned to the left edge either way (by design, see Positioning above); on Left it will sit on top of/overlap the Start button, which is a known limitation, not a crash.
 4. Change display scaling live (100/125/150%), confirm no drift.
 5. `taskkill /f /im explorer.exe` (self-restarts) — confirm the widget reappears correctly within ~60s, no crash.
 6. Pause/stop all media — confirm the widget collapses cleanly instead of showing an empty box.

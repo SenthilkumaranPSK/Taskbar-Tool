@@ -33,6 +33,15 @@ internal sealed class MediaSessionService : IDisposable
         _mediaManager.OnAnyPlaybackStateChanged += OnAnyPlaybackStateChanged;
         _mediaManager.OnAnySessionClosed += OnAnySessionClosed;
         _mediaManager.Start();
+
+        // MediaManager.Start() synchronously fires OnAnySessionOpened/OnAnyMediaPropertyChanged
+        // for sessions that already exist at startup (e.g. media that was already playing before
+        // this app launched) — before its own internal "started" flag is set. Those callbacks'
+        // calls into GetActiveSession() throw InvalidOperationException("MediaManager has not
+        // started"), which RefreshAsync's catch-all swallows, so the pre-existing session is
+        // silently dropped and never displayed. Refresh once more now that Start() has actually
+        // returned to pick up exactly that case.
+        _ = RefreshAsync();
     }
 
     public async Task PlayPauseAsync()
