@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 TaskbarMediaWidget is a Windows 11 WPF app with a single purpose: show a compact "now playing" media widget genuinely embedded in the real Windows taskbar (not a floating overlay), anchored to the taskbar's left edge. It reflects whatever app is currently playing media via the OS-level System Media Transport Controls (SMTC) — Spotify, browser tabs, YouTube Music, etc.
 
-This is a from-scratch reimplementation, inspired by (but not copied from — see licensing note below) [FluentFlyout](https://github.com/unchihugo/FluentFlyout)'s taskbar-widget feature, which was studied as reference and is summarized in `docs/reference-fluentflyout-taskbar-widget.md`. Deliberately out of scope: flyouts, volume mixer, lock-key indicators, audio visualizer, MSIX/Store packaging, licensing gates, localization, settings UI. If a feature isn't "show now-playing info docked in the taskbar," it doesn't belong here.
+This is a from-scratch reimplementation, inspired by (but not copied from — see licensing note below) [FluentFlyout](https://github.com/unchihugo/FluentFlyout)'s taskbar-widget feature, which was studied as reference and is summarized in `docs/reference-fluentflyout-taskbar-widget.md`. Deliberately out of scope **for the current codebase**: flyouts, volume mixer, lock-key indicators, audio visualizer, MSIX/Store packaging, licensing gates, localization, settings UI. If a feature isn't "show now-playing info docked in the taskbar," it doesn't belong here yet.
+
+`ROADMAP.md` sketches a much larger future direction (flyouts, an audio visualizer/spectrum engine, a volume mixer, Discord/Last.fm integrations, a settings UI, extra taskbar modules) that would supersede the out-of-scope list above. Treat it as an aspirational design doc, not a description of what exists today — none of its modules (`Audio/`, `Lyrics/`, `Flyouts/`, `Settings/`, etc.) have been built. Don't assume roadmap features exist when reading code, and don't start implementing roadmap items unless the user explicitly asks for that expansion.
 
 ## Build & run
 

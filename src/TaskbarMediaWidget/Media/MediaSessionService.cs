@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices.WindowsRuntime;
+using Microsoft.Win32;
 using TaskbarMediaWidget.Core;
 using WindowsMediaController;
 using static WindowsMediaController.MediaManager;
@@ -13,8 +14,16 @@ namespace TaskbarMediaWidget.Media;
 /// </summary>
 internal sealed class MediaSessionService : IDisposable
 {
+    // WindowsMediaController's own XML doc calls out a known bug where SMTC events stop firing;
+    // ForceUpdate() exists specifically to work around it. A tray app that runs for days is
+    // exactly the workload that hits it, so re-sync on a heartbeat plus resume-from-sleep/unlock
+    // rather than trusting events alone to keep arriving.
+    private const int HeartbeatIntervalMs = 45_000;
+
     private readonly MediaManager _mediaManager = new();
+    private readonly System.Timers.Timer _heartbeatTimer = new(HeartbeatIntervalMs) { AutoReset = true };
     private volatile NowPlayingInfo? _currentNowPlaying;
+    private long _refreshGeneration;
 
     public event Action<NowPlayingInfo?>? NowPlayingChanged;
 
@@ -32,6 +41,7 @@ internal sealed class MediaSessionService : IDisposable
         _mediaManager.OnAnyMediaPropertyChanged += OnAnyMediaPropertyChanged;
         _mediaManager.OnAnyPlaybackStateChanged += OnAnyPlaybackStateChanged;
         _mediaManager.OnAnySessionClosed += OnAnySessionClosed;
+        _mediaManager.OnFocusedSessionChanged += OnFocusedSessionChanged;
         _mediaManager.Start();
 
         // MediaManager.Start() synchronously fires OnAnySessionOpened/OnAnyMediaPropertyChanged
@@ -41,6 +51,42 @@ internal sealed class MediaSessionService : IDisposable
         // started"), which RefreshAsync's catch-all swallows, so the pre-existing session is
         // silently dropped and never displayed. Refresh once more now that Start() has actually
         // returned to pick up exactly that case.
+        _ = RefreshAsync();
+
+        _heartbeatTimer.Elapsed += (_, _) => ForceUpdateAndRefresh();
+        _heartbeatTimer.Start();
+
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        SystemEvents.SessionSwitch += OnSessionSwitch;
+    }
+
+    private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Resume)
+        {
+            ForceUpdateAndRefresh();
+        }
+    }
+
+    private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
+    {
+        if (e.Reason is SessionSwitchReason.SessionUnlock or SessionSwitchReason.ConsoleConnect)
+        {
+            ForceUpdateAndRefresh();
+        }
+    }
+
+    private void ForceUpdateAndRefresh()
+    {
+        try
+        {
+            _mediaManager.ForceUpdate();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"ForceUpdate failed: {ex.Message}");
+        }
+
         _ = RefreshAsync();
     }
 
@@ -78,6 +124,11 @@ internal sealed class MediaSessionService : IDisposable
 
     private void OnAnySessionClosed(MediaSession mediaSession) => _ = RefreshAsync();
 
+    // GetFocusedSession() reflects the OS's current focus pick, but nothing previously told this
+    // service when that pick changed — so switching focus between two already-open sessions (e.g.
+    // pausing Spotify and starting a YouTube tab) never triggered a refresh on its own.
+    private void OnFocusedSessionChanged(MediaSession mediaSession) => _ = RefreshAsync();
+
     /// <summary>
     /// Session selection, simplest-first: prefer the session the OS considers "focused," else
     /// the first session that's actually Playing, else just the first available session, else
@@ -85,7 +136,32 @@ internal sealed class MediaSessionService : IDisposable
     /// </summary>
     private MediaSession? GetActiveSession()
     {
-        var sessions = _mediaManager.CurrentMediaSessions.Values.ToList();
+        if (!_mediaManager.IsStarted)
+        {
+            return null;
+        }
+
+        List<MediaSession> sessions;
+        try
+        {
+            sessions = _mediaManager.CurrentMediaSessions.Values.ToList();
+        }
+        catch (InvalidOperationException)
+        {
+            // CurrentMediaSessions is a plain Dictionary mutated from SMTC callback threads with
+            // no synchronization; a session opening/closing mid-enumeration throws here. Retry
+            // once against a fresh snapshot rather than letting the fault propagate — this runs
+            // on both UI-thread button clicks and background refreshes.
+            try
+            {
+                sessions = _mediaManager.CurrentMediaSessions.Values.ToList();
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
         if (sessions.Count == 0)
         {
             return null;
@@ -106,9 +182,21 @@ internal sealed class MediaSessionService : IDisposable
 
     private async Task RefreshAsync()
     {
+        // Every SMTC callback fires a refresh on an arbitrary thread-pool thread, and building
+        // NowPlayingInfo awaits property/thumbnail reads that can take a while — overlapping
+        // refreshes routinely finish out of order. Stamp each one; if a newer refresh has already
+        // started by the time this one finishes, drop this result instead of publishing stale
+        // data (e.g. the previous track's cover art under the new track's title) over it.
+        var generation = Interlocked.Increment(ref _refreshGeneration);
         try
         {
             var info = await BuildNowPlayingInfoAsync(GetActiveSession());
+
+            if (Interlocked.Read(ref _refreshGeneration) != generation)
+            {
+                return;
+            }
+
             _currentNowPlaying = info;
             NowPlayingChanged?.Invoke(info);
         }
@@ -158,10 +246,16 @@ internal sealed class MediaSessionService : IDisposable
 
     public void Dispose()
     {
+        _heartbeatTimer.Stop();
+        _heartbeatTimer.Dispose();
+        SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        SystemEvents.SessionSwitch -= OnSessionSwitch;
+
         _mediaManager.OnAnySessionOpened -= OnAnySessionOpened;
         _mediaManager.OnAnyMediaPropertyChanged -= OnAnyMediaPropertyChanged;
         _mediaManager.OnAnyPlaybackStateChanged -= OnAnyPlaybackStateChanged;
         _mediaManager.OnAnySessionClosed -= OnAnySessionClosed;
+        _mediaManager.OnFocusedSessionChanged -= OnFocusedSessionChanged;
         _mediaManager.Dispose();
     }
 }

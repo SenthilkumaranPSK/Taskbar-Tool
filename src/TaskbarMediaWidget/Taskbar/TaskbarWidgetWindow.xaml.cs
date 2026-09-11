@@ -12,31 +12,28 @@ namespace TaskbarMediaWidget.Taskbar;
 /// docs/reference-fluentflyout-taskbar-widget.md for why each piece of this exists.
 ///
 /// Recreate, don't revive: when explorer.exe restarts, DestroyWindow on the taskbar destroys
-/// this window's HWND as a side effect (it's a true child now). App.xaml.cs is responsible for
-/// disposing this instance and constructing a fresh one when <see cref="ExplorerRestarted"/>
-/// fires — this class does not attempt to resurrect itself.
+/// this window's HWND as a side effect (it's a true child now) — this window has no way to know
+/// that happened from the inside, since a destroyed HWND can't run any more code. It can only
+/// notice on the next poll tick that its own handle is gone (see the <see cref="NativeMethods.IsWindow"/>
+/// check in <see cref="TryReposition"/>) and stop trying to use it. Recovery itself is owned by
+/// <c>App</c> via <see cref="ShellWatchdogWindow"/> — a separate, never-reparented window that
+/// stays eligible to receive "TaskbarCreated" for the life of the process and drives recreation
+/// of a fresh instance of this class.
 /// </summary>
 public partial class TaskbarWidgetWindow : Window
 {
     private const int PollIntervalMs = 1300;
-    private const int ExplorerReadyPollIntervalMs = 200;
-    private const int ExplorerReadyTimeoutMs = 60_000;
 
     private readonly DispatcherTimer _pollTimer;
-    private readonly uint _taskbarCreatedMessage;
 
     private IntPtr _hwnd;
     private IntPtr _taskbarHandle;
     private HwndSource? _hwndSource;
-    private bool _explorerRestarting;
     private bool _isSetUp;
 
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
-
-    /// <summary>Fires once Explorer is confirmed back up after a restart; caller should recreate this window.</summary>
-    public event EventHandler? ExplorerRestarted;
 
     public TaskbarWidgetWindow()
     {
@@ -47,8 +44,6 @@ public partial class TaskbarWidgetWindow : Window
         Widget.PreviousRequested += (_, _) => PreviousRequested?.Invoke(this, EventArgs.Empty);
         Widget.PlayPauseRequested += (_, _) => PlayPauseRequested?.Invoke(this, EventArgs.Empty);
         Widget.NextRequested += (_, _) => NextRequested?.Invoke(this, EventArgs.Empty);
-
-        _taskbarCreatedMessage = NativeMethods.RegisterWindowMessage("TaskbarCreated");
 
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -114,8 +109,14 @@ public partial class TaskbarWidgetWindow : Window
 
     private void TryReposition()
     {
-        if (_explorerRestarting)
+        if (_hwnd != IntPtr.Zero && !NativeMethods.IsWindow(_hwnd))
         {
+            // The taskbar was destroyed out from under us (explorer.exe restart) — since we were
+            // a true WS_CHILD, our own HWND was destroyed as a side effect and there is nothing
+            // left here to reposition. Stop polling; ShellWatchdogWindow (in App) will drive
+            // recreation of a fresh instance once Explorer comes back.
+            _pollTimer.Stop();
+            AppLog.Info("Widget HWND no longer exists (Explorer restart); stopping poll.");
             return;
         }
 
@@ -186,12 +187,6 @@ public partial class TaskbarWidgetWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == (int)_taskbarCreatedMessage)
-        {
-            _ = HandleExplorerRestartAsync();
-            return IntPtr.Zero;
-        }
-
         if (msg is NativeMethods.WM_DPICHANGED or NativeMethods.WM_DPICHANGED_AFTERPARENT)
         {
             TryReposition();
@@ -200,41 +195,12 @@ public partial class TaskbarWidgetWindow : Window
         {
             TryReposition();
         }
-        else if (msg == NativeMethods.WM_SETTINGCHANGE && wParam.ToInt32() == NativeMethods.SPI_SETWORKAREA)
+        else if (msg == NativeMethods.WM_SETTINGCHANGE && (int)(long)wParam == NativeMethods.SPI_SETWORKAREA)
         {
             TryReposition();
         }
 
         return IntPtr.Zero;
-    }
-
-    private async Task HandleExplorerRestartAsync()
-    {
-        if (_explorerRestarting)
-        {
-            return;
-        }
-
-        _explorerRestarting = true;
-        _isSetUp = false;
-        AppLog.Info("Detected Explorer restart; waiting for taskbar to come back.");
-
-        var waited = 0;
-        while (waited < ExplorerReadyTimeoutMs)
-        {
-            var handle = TaskbarLocator.FindTaskbarHandle();
-            if (handle != IntPtr.Zero && NativeMethods.GetWindowRect(handle, out var rect) && rect.Width > 0 && rect.Height > 0)
-            {
-                break;
-            }
-
-            await Task.Delay(ExplorerReadyPollIntervalMs);
-            waited += ExplorerReadyPollIntervalMs;
-        }
-
-        AppLog.Info("Taskbar is back; requesting widget window recreation.");
-        _explorerRestarting = false;
-        Dispatcher.Invoke(() => ExplorerRestarted?.Invoke(this, EventArgs.Empty));
     }
 
     protected override void OnClosed(EventArgs e)
