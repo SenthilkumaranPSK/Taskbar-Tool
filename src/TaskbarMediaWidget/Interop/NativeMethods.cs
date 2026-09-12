@@ -53,10 +53,6 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
-
     // Must stay a classic DllImport, not a LibraryImport source-generated binding — confirmed
     // gotcha from the reference app: LibraryImport broke topmost/visibility behavior for this
     // specific call when reparented into another process's window.
@@ -80,12 +76,5 @@ internal static class NativeMethods
 
         public readonly int Width => Right - Left;
         public readonly int Height => Bottom - Top;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct POINT
-    {
-        public int X;
-        public int Y;
     }
 }

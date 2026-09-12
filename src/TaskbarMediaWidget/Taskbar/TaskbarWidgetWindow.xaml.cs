@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -22,7 +23,8 @@ namespace TaskbarMediaWidget.Taskbar;
 /// </summary>
 public partial class TaskbarWidgetWindow : Window
 {
-    private const int PollIntervalMs = 1300;
+    private const int ActivePollIntervalMs = 1300;
+    private const int HiddenPollIntervalMs = 5000;
 
     private readonly DispatcherTimer _pollTimer;
 
@@ -30,6 +32,9 @@ public partial class TaskbarWidgetWindow : Window
     private IntPtr _taskbarHandle;
     private HwndSource? _hwndSource;
     private bool _isSetUp;
+    private int _lastMeasuredContentVersion = -1;
+    private System.Windows.Size _lastNaturalSize;
+    private (int X, int Y, int Width, int Height)? _lastAppliedRect;
 
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
@@ -40,6 +45,7 @@ public partial class TaskbarWidgetWindow : Window
         InitializeComponent();
 
         WindowStyleHelper.SetNoActivate(this);
+        Widget.ApplyTheme(ThemeDetector.IsSystemLightTheme());
 
         Widget.PreviousRequested += (_, _) => PreviousRequested?.Invoke(this, EventArgs.Empty);
         Widget.PlayPauseRequested += (_, _) => PlayPauseRequested?.Invoke(this, EventArgs.Empty);
@@ -47,7 +53,7 @@ public partial class TaskbarWidgetWindow : Window
 
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(PollIntervalMs),
+            Interval = TimeSpan.FromMilliseconds(HiddenPollIntervalMs),
         };
         _pollTimer.Tick += (_, _) => TryReposition();
 
@@ -66,11 +72,13 @@ public partial class TaskbarWidgetWindow : Window
         if (info is null)
         {
             SetWindowVisible(false);
+            _pollTimer.Interval = TimeSpan.FromMilliseconds(HiddenPollIntervalMs);
             return;
         }
 
         TryReposition();
         SetWindowVisible(true);
+        _pollTimer.Interval = TimeSpan.FromMilliseconds(ActivePollIntervalMs);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -80,6 +88,12 @@ public partial class TaskbarWidgetWindow : Window
         _hwndSource?.AddHook(WndProc);
 
         AttachToTaskbar();
+
+        // Start hidden regardless of whether AttachToTaskbar succeeded — a freshly (re)created
+        // window has no now-playing state yet, and UpdateNowPlaying's own hide-if-null call would
+        // otherwise leave a brief window (pun intended) where an empty box could be shown.
+        SetWindowVisible(false);
+
         _pollTimer.Start();
     }
 
@@ -104,6 +118,7 @@ public partial class TaskbarWidgetWindow : Window
         }
 
         _isSetUp = true;
+        _lastAppliedRect = null; // Force a fresh SetWindowPos next tick — we just got a new parent.
         AppLog.Info("Attached widget window to taskbar.");
     }
 
@@ -151,14 +166,27 @@ public partial class TaskbarWidgetWindow : Window
         var dpiScale = TaskbarLocator.GetDpiScale(_taskbarHandle);
         var taskbarRect = TaskbarLocator.GetTaskbarRect(_taskbarHandle);
 
-        var naturalSize = Widget.MeasureNaturalSize();
-        Width = naturalSize.Width;
-        Height = naturalSize.Height;
+        // A full WPF measure plus a Width/Height assignment (itself another layout pass) is
+        // wasted work on the ~99% of ticks where the content hasn't changed since last time —
+        // only redo it when the widget's own content-version counter says otherwise.
+        if (Widget.ContentVersion != _lastMeasuredContentVersion)
+        {
+            _lastNaturalSize = Widget.MeasureNaturalSize();
+            Width = _lastNaturalSize.Width;
+            Height = _lastNaturalSize.Height;
+            _lastMeasuredContentVersion = Widget.ContentVersion;
+        }
 
         var startX = (int)Math.Round(LeftEdgeMarginLogicalPx * dpiScale);
-        var physicalWidth = (int)Math.Round(naturalSize.Width * dpiScale);
-        var physicalHeight = (int)Math.Round(naturalSize.Height * dpiScale);
+        var physicalWidth = (int)Math.Round(_lastNaturalSize.Width * dpiScale);
+        var physicalHeight = (int)Math.Round(_lastNaturalSize.Height * dpiScale);
         var y = (int)Math.Round((taskbarRect.Height - physicalHeight) / 2.0);
+
+        var appliedRect = (startX, y, physicalWidth, physicalHeight);
+        if (appliedRect == _lastAppliedRect)
+        {
+            return; // Identical to what's already on screen — skip the SetWindowPos call.
+        }
 
         NativeMethods.SetWindowPos(
             _hwnd,
@@ -168,10 +196,17 @@ public partial class TaskbarWidgetWindow : Window
             physicalWidth,
             physicalHeight,
             NativeMethods.SWP_NOZORDER | NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_ASYNCWINDOWPOS | NativeMethods.SWP_SHOWWINDOW);
+
+        _lastAppliedRect = appliedRect;
     }
 
     private void SetWindowVisible(bool visible)
     {
+        if (!visible)
+        {
+            Widget.StopMarquee();
+        }
+
         if (_hwnd == IntPtr.Zero)
         {
             return;
@@ -195,9 +230,19 @@ public partial class TaskbarWidgetWindow : Window
         {
             TryReposition();
         }
-        else if (msg == NativeMethods.WM_SETTINGCHANGE && (int)(long)wParam == NativeMethods.SPI_SETWORKAREA)
+        else if (msg == NativeMethods.WM_SETTINGCHANGE)
         {
-            TryReposition();
+            if ((int)(long)wParam == NativeMethods.SPI_SETWORKAREA)
+            {
+                TryReposition();
+            }
+
+            // Broadcast with lParam pointing at the literal string "ImmersiveColorSet" whenever
+            // the user flips Settings > Personalization > Colors between light and dark.
+            if (lParam != IntPtr.Zero && Marshal.PtrToStringUni(lParam) == "ImmersiveColorSet")
+            {
+                Widget.ApplyTheme(ThemeDetector.IsSystemLightTheme());
+            }
         }
 
         return IntPtr.Zero;

@@ -50,9 +50,11 @@ public partial class App : System.Windows.Application
         _shellWatchdog = new ShellWatchdogWindow();
         _shellWatchdog.TaskbarCreated += (_, _) => _ = HandleExplorerRestartAsync();
 
-        CreateWidgetWindow();
-
+        // Start the media pipeline before the window exists, giving its async session-property
+        // reads a head start — CreateWidgetWindow also starts the widget hidden regardless (see
+        // TaskbarWidgetWindow.OnSourceInitialized), so there's no visible empty-box moment either way.
         _mediaSessionService.Start();
+        CreateWidgetWindow();
     }
 
     private void CreateWidgetWindow()
@@ -125,14 +127,29 @@ public partial class App : System.Windows.Application
         if (_widgetWindow is not null)
         {
             _mediaSessionService!.NowPlayingChanged -= OnNowPlayingChanged;
-            _widgetWindow.Close();
+            CloseWidgetWindow(_widgetWindow);
         }
 
         CreateWidgetWindow();
     }
 
+    // WPF isn't always graceful about Close() on a window whose HWND was already destroyed
+    // externally (as ours is after an Explorer restart) — guard it rather than let a teardown
+    // exception here take down the rest of shutdown/recreation.
+    private static void CloseWidgetWindow(TaskbarWidgetWindow window)
+    {
+        try
+        {
+            window.Close();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to close widget window cleanly: {ex.Message}");
+        }
+    }
+
     private void OnNowPlayingChanged(NowPlayingInfo? info) =>
-        Dispatcher.Invoke(() => _widgetWindow?.UpdateNowPlaying(info));
+        Dispatcher.InvokeAsync(() => _widgetWindow?.UpdateNowPlaying(info));
 
     private void ExitApplication()
     {
@@ -144,7 +161,11 @@ public partial class App : System.Windows.Application
             _mediaSessionService.Dispose();
         }
 
-        _widgetWindow?.Close();
+        if (_widgetWindow is not null)
+        {
+            CloseWidgetWindow(_widgetWindow);
+        }
+
         _shellWatchdog?.Dispose();
         _trayIconService?.Dispose();
         _instanceGuard?.Dispose();

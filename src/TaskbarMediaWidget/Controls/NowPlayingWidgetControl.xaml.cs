@@ -1,5 +1,7 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using TaskbarMediaWidget.Media;
 
@@ -8,6 +10,8 @@ namespace TaskbarMediaWidget.Controls;
 public partial class NowPlayingWidgetControl : System.Windows.Controls.UserControl
 {
     private const double ScrollPixelsPerSecond = 30;
+    private const string PlayGlyph = "";
+    private const string PauseGlyph = "";
 
     private string? _lastTitle;
     private string? _lastArtist;
@@ -21,12 +25,20 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         InitializeComponent();
     }
 
+    /// <summary>
+    /// Bumped whenever the displayed title/artist actually changes — i.e. whenever the natural
+    /// size of the content could have changed. The host window uses this to skip re-measuring
+    /// and re-applying its own size/position on poll ticks where nothing changed.
+    /// </summary>
+    public int ContentVersion { get; private set; }
+
     /// <summary>Updates the widget's content. Pass null to represent "nothing playing."</summary>
     public void SetNowPlaying(NowPlayingInfo? info)
     {
         if (info is null)
         {
             Visibility = Visibility.Collapsed;
+            StopMarquee();
             _lastTitle = null;
             _lastArtist = null;
             return;
@@ -44,15 +56,28 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         PreviousButton.IsEnabled = info.IsPreviousEnabled;
         NextButton.IsEnabled = info.IsNextEnabled;
         PlayPauseButton.IsEnabled = info.IsPlayPauseEnabled;
-        PlayPauseButton.Content = info.IsPlaying ? "⏸" : "▶";
+        PlayPauseButton.Content = info.IsPlaying ? PauseGlyph : PlayGlyph;
+        PlayPauseButton.SetValue(AutomationProperties.NameProperty, info.IsPlaying ? "Pause" : "Play");
 
-        // Only reset/restart the scrolling marquee when the track actually changed — otherwise a
-        // play/pause toggle (which also raises SetNowPlaying) yanks mid-scroll text back to 0.
         if (isNewTrack)
         {
             _lastTitle = title;
             _lastArtist = info.Artist;
-            RestartMarqueeIfNeeded();
+            ContentVersion++;
+        }
+
+        // A storyboard with RepeatBehavior.Forever keeps WPF's composition thread busy at display
+        // refresh rate for as long as it runs — pointless (and not free on battery) while paused
+        // or hidden, so only keep it running while actually playing. Only reset scroll position
+        // to 0 on an actual track change, otherwise a play/pause toggle (which also calls
+        // SetNowPlaying) would yank mid-scroll text back to the start.
+        if (!info.IsPlaying)
+        {
+            StopMarquee();
+        }
+        else if (isNewTrack)
+        {
+            RestartMarquee();
         }
     }
 
@@ -63,7 +88,22 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         return DesiredSize;
     }
 
-    private void RestartMarqueeIfNeeded()
+    /// <summary>Stops the scrolling marquee in place — call whenever the host window is hidden.</summary>
+    public void StopMarquee() => TextStack.BeginAnimation(Canvas.LeftProperty, null);
+
+    /// <summary>Swaps the light/dark text and hover brushes to match the taskbar's current theme.</summary>
+    public void ApplyTheme(bool isLightTheme)
+    {
+        Resources["PrimaryTextBrush"] = new SolidColorBrush(isLightTheme ? Colors.Black : Colors.White);
+        Resources["SecondaryTextBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0xBB, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0xBB, 0xFF, 0xFF, 0xFF));
+        Resources["HoverBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0x22, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
+    }
+
+    private void RestartMarquee()
     {
         TextStack.BeginAnimation(Canvas.LeftProperty, null);
         Canvas.SetLeft(TextStack, 0);

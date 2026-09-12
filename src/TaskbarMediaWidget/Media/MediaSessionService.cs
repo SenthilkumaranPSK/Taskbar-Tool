@@ -22,8 +22,11 @@ internal sealed class MediaSessionService : IDisposable
 
     private readonly MediaManager _mediaManager = new();
     private readonly System.Timers.Timer _heartbeatTimer = new(HeartbeatIntervalMs) { AutoReset = true };
+    private readonly object _thumbnailCacheLock = new();
     private volatile NowPlayingInfo? _currentNowPlaying;
     private long _refreshGeneration;
+    private (string Title, string Artist, string AlbumTitle)? _lastThumbnailKey;
+    private System.Windows.Media.Imaging.BitmapImage? _lastThumbnail;
 
     public event Action<NowPlayingInfo?>? NowPlayingChanged;
 
@@ -206,7 +209,7 @@ internal sealed class MediaSessionService : IDisposable
         }
     }
 
-    private static async Task<NowPlayingInfo?> BuildNowPlayingInfoAsync(MediaSession? session)
+    private async Task<NowPlayingInfo?> BuildNowPlayingInfoAsync(MediaSession? session)
     {
         if (session?.ControlSession is null)
         {
@@ -232,7 +235,7 @@ internal sealed class MediaSessionService : IDisposable
         }
 
         var playbackInfo = controlSession.GetPlaybackInfo();
-        var thumbnail = await ThumbnailConverter.TryConvertAsync(mediaProperties.Thumbnail);
+        var thumbnail = await GetThumbnailAsync(mediaProperties);
 
         return new NowPlayingInfo(
             Title: mediaProperties.Title ?? string.Empty,
@@ -242,6 +245,36 @@ internal sealed class MediaSessionService : IDisposable
             IsPreviousEnabled: playbackInfo?.Controls?.IsPreviousEnabled ?? false,
             IsPlayPauseEnabled: (playbackInfo?.Controls?.IsPlayEnabled ?? false) || (playbackInfo?.Controls?.IsPauseEnabled ?? false),
             IsNextEnabled: playbackInfo?.Controls?.IsNextEnabled ?? false);
+    }
+
+    // Chromium-based browsers fire media-property-changed aggressively — often several times for
+    // the same track. Each call previously re-opened the SMTC thumbnail stream and re-decoded a
+    // JPEG to produce a bitmap identical to the one already on screen. Cache the one most recent
+    // decode keyed on (title, artist, album) and skip the decode entirely on a repeat.
+    private async Task<System.Windows.Media.Imaging.BitmapImage?> GetThumbnailAsync(
+        Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties)
+    {
+        var key = (mediaProperties.Title ?? string.Empty, mediaProperties.Artist ?? string.Empty, mediaProperties.AlbumTitle ?? string.Empty);
+
+        lock (_thumbnailCacheLock)
+        {
+            if (_lastThumbnailKey == key)
+            {
+                return _lastThumbnail;
+            }
+        }
+
+        // Raised from the original 64px default so cover art stays reasonably sharp at 200% DPI
+        // scaling, where a 64px source stretched to the widget's 24dp box would visibly blur.
+        var thumbnail = await ThumbnailConverter.TryConvertAsync(mediaProperties.Thumbnail, decodePixelWidth: 96);
+
+        lock (_thumbnailCacheLock)
+        {
+            _lastThumbnailKey = key;
+            _lastThumbnail = thumbnail;
+        }
+
+        return thumbnail;
     }
 
     public void Dispose()

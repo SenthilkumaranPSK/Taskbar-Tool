@@ -7,12 +7,22 @@
              Height="32"
              d:DesignWidth="220">
     <UserControl.Resources>
+        <!--
+            Default (dark) values — TaskbarWidgetWindow.ApplyTheme overrides these three keys at
+            runtime based on the taskbar's actual light/dark state, since these are hardcoded
+            white/near-white otherwise and become invisible on a Light-mode (near-white) taskbar.
+        -->
+        <SolidColorBrush x:Key="PrimaryTextBrush" Color="White" />
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#BBFFFFFF" />
+        <SolidColorBrush x:Key="HoverBrush" Color="#22FFFFFF" />
+
         <Style x:Key="TransportButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="24" />
             <Setter Property="Height" Value="24" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -22,7 +32,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bg" Property="Background" Value="#22FFFFFF" />
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.35" />
@@ -47,15 +57,19 @@
 
         <Canvas x:Name="TextClip" Grid.Column="1" ClipToBounds="True" Width="110">
             <StackPanel x:Name="TextStack" Orientation="Vertical" Canvas.Left="0" Canvas.Top="1">
-                <TextBlock x:Name="TitleText" Foreground="White" FontSize="11" FontWeight="SemiBold" />
-                <TextBlock x:Name="ArtistText" Foreground="#BBFFFFFF" FontSize="10" />
+                <TextBlock x:Name="TitleText" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="11" FontWeight="SemiBold"
+                           AutomationProperties.LiveSetting="Polite" />
+                <TextBlock x:Name="ArtistText" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="10" />
             </StackPanel>
         </Canvas>
 
         <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="4,0,4,0">
-            <Button x:Name="PreviousButton" Style="{StaticResource TransportButtonStyle}" Click="PreviousButton_Click" Content="⏮" />
-            <Button x:Name="PlayPauseButton" Style="{StaticResource TransportButtonStyle}" Click="PlayPauseButton_Click" Content="⏸" />
-            <Button x:Name="NextButton" Style="{StaticResource TransportButtonStyle}" Click="NextButton_Click" Content="⏭" />
+            <Button x:Name="PreviousButton" Style="{StaticResource TransportButtonStyle}" Click="PreviousButton_Click"
+                    Content="&#xE892;" AutomationProperties.Name="Previous track" />
+            <Button x:Name="PlayPauseButton" Style="{StaticResource TransportButtonStyle}" Click="PlayPauseButton_Click"
+                    Content="&#xE769;" AutomationProperties.Name="Pause" />
+            <Button x:Name="NextButton" Style="{StaticResource TransportButtonStyle}" Click="NextButton_Click"
+                    Content="&#xE893;" AutomationProperties.Name="Next track" />
         </StackPanel>
     </Grid>
 </UserControl>
