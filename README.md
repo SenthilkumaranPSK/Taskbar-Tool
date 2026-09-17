@@ -18,7 +18,7 @@ The widget docks flush against the taskbar's left edge and shows cover art, titl
   ↑ anchored to the taskbar's left edge, independent of Start's position
 ```
 
-When nothing is playing, the widget disappears entirely — no empty box left behind.
+When nothing is playing, the widget disappears entirely — no empty box left behind. When something is, the pill picks up a subtle tint sampled from the album art's dominant color (and stays untinted for greyscale or black-and-white covers, rather than smearing a grey wash across the taskbar).
 
 ## Why it's built the way it is
 
@@ -44,17 +44,19 @@ dotnet run --project src/TaskbarMediaWidget/TaskbarMediaWidget.csproj
 
 Or open `Taskbar-Tool.slnx` in Visual Studio and run with `TaskbarMediaWidget` as the startup project.
 
-The app has no visible main window — it's tray-only. Right-click the tray icon (it may be tucked behind the **`^`** hidden-icons chevron the first time) and choose **Exit** to close it. Launching a second copy while one is already running just exits immediately (single-instance guarded).
+The app has no visible main window — it's tray-only. Right-click the tray icon (it may be tucked behind the **`^`** hidden-icons chevron the first time) for two items: **Run at startup**, which toggles a per-user `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry (no admin prompt), and **Exit**, which is the only way to close the app. Launching a second copy while one is already running just exits immediately (single-instance guarded).
 
 ## How it works, briefly
 
 | Piece | Responsibility |
 |---|---|
-| `Taskbar/TaskbarWidgetWindow.xaml.cs` | Reparents itself into `Shell_TrayWnd`; a ~1.3s self-healing poll (plus DPI/display-change hooks) keeps it positioned and re-attaches after Explorer restarts |
+| `Taskbar/TaskbarWidgetWindow.xaml.cs` | Reparents itself into `Shell_TrayWnd`; a self-healing poll (1.3s while visible, 5s while hidden) plus DPI/display-change hooks keeps it positioned and re-attaches after Explorer restarts |
 | `Taskbar/TaskbarLocator.cs` | Resolves the taskbar's handle, DPI, and precise client rect |
 | `Media/MediaSessionService.cs` | Wraps [`WindowsMediaController`](https://github.com/DubyaDude/WindowsMediaController) (an SMTC wrapper) and picks one active session: focused → else playing → else whatever's available |
 | `Media/ThumbnailConverter.cs` | Decodes an SMTC thumbnail stream into a WPF `BitmapImage` |
-| `Tray/TrayIconService.cs` | The only visible chrome — a tray icon with an Exit item |
+| `Media/AccentColorExtractor.cs` | Reduces that thumbnail to one vibrant color (weighted hue histogram) for the pill tint |
+| `Core/StartupRegistration.cs` | Reads/writes the `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry behind the tray's "Run at startup" toggle |
+| `Tray/TrayIconService.cs` | The only visible chrome — a tray icon with "Run at startup" and "Exit" |
 
 Full architectural notes, gotchas, and the reasoning behind non-obvious decisions live in [`CLAUDE.md`](CLAUDE.md).
 
@@ -62,7 +64,6 @@ Full architectural notes, gotchas, and the reasoning behind non-obvious decision
 
 - **Left-aligned taskbars**: the widget always docks to the taskbar's left edge. If your taskbar alignment is set to **Left** (Settings → Personalization → Taskbar), the widget will visually overlap the real Start button. It's tuned for the Windows 11 default (**Center**-aligned), where the left edge is empty space.
 - Single monitor only — secondary-monitor taskbars aren't targeted.
-- Tray icon is the stock system icon (no custom `.ico` yet).
 - No automated tests — this manipulates `explorer.exe`'s real window tree, which isn't meaningfully unit-testable. Verification is manual (checklist in `CLAUDE.md`).
 
 ## Deliberately out of scope

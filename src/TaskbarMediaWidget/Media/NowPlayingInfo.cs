@@ -11,7 +11,8 @@ public sealed record NowPlayingInfo(
     GlobalSystemMediaTransportControlsSessionPlaybackStatus PlaybackStatus,
     bool IsPreviousEnabled,
     bool IsPlayPauseEnabled,
-    bool IsNextEnabled)
+    bool IsNextEnabled,
+    System.Windows.Media.Color? AccentColor = null)
 {
     public bool IsPlaying => PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
 }

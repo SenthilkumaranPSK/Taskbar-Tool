@@ -15,6 +15,8 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 
     private string? _lastTitle;
     private string? _lastArtist;
+    private System.Windows.Media.Color? _accentColor;
+    private bool _isLightTheme;
 
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
@@ -39,6 +41,7 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         {
             Visibility = Visibility.Collapsed;
             StopMarquee();
+            ApplyAccent(null);
             _lastTitle = null;
             _lastArtist = null;
             return;
@@ -58,6 +61,8 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         PlayPauseButton.IsEnabled = info.IsPlayPauseEnabled;
         PlayPauseButton.Content = info.IsPlaying ? PauseGlyph : PlayGlyph;
         PlayPauseButton.SetValue(AutomationProperties.NameProperty, info.IsPlaying ? "Pause" : "Play");
+
+        ApplyAccent(info.AccentColor);
 
         if (isNewTrack)
         {
@@ -94,6 +99,7 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
     /// <summary>Swaps the light/dark text and hover brushes to match the taskbar's current theme.</summary>
     public void ApplyTheme(bool isLightTheme)
     {
+        _isLightTheme = isLightTheme;
         Resources["PrimaryTextBrush"] = new SolidColorBrush(isLightTheme ? Colors.Black : Colors.White);
         Resources["SecondaryTextBrush"] = new SolidColorBrush(isLightTheme
             ? System.Windows.Media.Color.FromArgb(0xBB, 0x00, 0x00, 0x00)
@@ -101,6 +107,53 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         Resources["HoverBrush"] = new SolidColorBrush(isLightTheme
             ? System.Windows.Media.Color.FromArgb(0x22, 0x00, 0x00, 0x00)
             : System.Windows.Media.Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
+
+        // The tint's alpha differs per theme, so the current accent has to be rebuilt, not kept.
+        ApplyAccent(_accentColor, force: true);
+    }
+
+    /// <summary>
+    /// Tints the pill from the album art's dominant color. Called on every SetNowPlaying (which
+    /// Chromium-based browsers trigger many times per track), so it early-outs unless the color
+    /// actually changed — otherwise every stray property-changed event would allocate and freeze
+    /// a fresh brush pair for an identical result.
+    /// </summary>
+    private void ApplyAccent(System.Windows.Media.Color? accent, bool force = false)
+    {
+        if (!force && Nullable.Equals(_accentColor, accent))
+        {
+            return;
+        }
+
+        _accentColor = accent;
+
+        if (accent is not { } color)
+        {
+            PillBorder.Background = System.Windows.Media.Brushes.Transparent;
+            PillBorder.BorderBrush = System.Windows.Media.Brushes.Transparent;
+            return;
+        }
+
+        // Kept deliberately faint: this sits on top of the real taskbar, and anything stronger
+        // reads as a foreign panel bolted onto the shell rather than part of it. A light taskbar
+        // needs slightly less alpha than a dark one for the same perceived weight.
+        var (fillStart, fillEnd, edge) = _isLightTheme
+            ? ((byte)0x3C, (byte)0x0E, (byte)0x59)
+            : ((byte)0x4A, (byte)0x12, (byte)0x66);
+
+        var fill = new LinearGradientBrush
+        {
+            StartPoint = new System.Windows.Point(0, 0),
+            EndPoint = new System.Windows.Point(1, 0),
+        };
+        fill.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(fillStart, color.R, color.G, color.B), 0));
+        fill.GradientStops.Add(new GradientStop(System.Windows.Media.Color.FromArgb(fillEnd, color.R, color.G, color.B), 1));
+        fill.Freeze();
+        PillBorder.Background = fill;
+
+        var stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(edge, color.R, color.G, color.B));
+        stroke.Freeze();
+        PillBorder.BorderBrush = stroke;
     }
 
     private void RestartMarquee()

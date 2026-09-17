@@ -13,10 +13,21 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Dubya.WindowsMediaController" Version="2.5.6" />
+  </ItemGroup>
+
+  <!--
+    ApplicationIcon above only sets the icon compiled into the .exe's Win32 resources; it does not
+    make the file readable at runtime. TrayIconService loads the same .ico through a pack:// URI to
+    pick a size-appropriate variant for the notification area, and that needs it as a WPF Resource
+    as well. .ico has no default build action, so this include is required, not redundant.
+  -->
+  <ItemGroup>
+    <Resource Include="Resources\app.ico" />
   </ItemGroup>
 
   <!--

@@ -44,6 +44,14 @@
         </Style>
     </UserControl.Resources>
 
+    <!--
+        PillBorder is tinted at runtime from the album art's dominant color (ApplyAccent); it stays
+        fully transparent when the art has no usable hue, which is exactly how the widget looked
+        before the tint existed. BorderThickness is a constant 1, so it shifts the control's natural
+        width by a fixed 2px and never invalidates the ContentVersion measure-skip in the host window.
+    -->
+    <Border x:Name="PillBorder" CornerRadius="8" BorderThickness="1"
+            Background="Transparent" BorderBrush="Transparent">
     <Grid x:Name="RootGrid" Background="Transparent">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
@@ -72,4 +80,5 @@
                     Content="&#xE893;" AutomationProperties.Name="Next track" />
         </StackPanel>
     </Grid>
+    </Border>
 </UserControl>
