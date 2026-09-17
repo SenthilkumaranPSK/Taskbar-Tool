@@ -55,7 +55,19 @@ public partial class TaskbarWidgetWindow : Window
         {
             Interval = TimeSpan.FromMilliseconds(HiddenPollIntervalMs),
         };
-        _pollTimer.Tick += (_, _) => TryReposition();
+        _pollTimer.Tick += (_, _) =>
+        {
+            TryReposition();
+
+            // Hand idle memory back periodically while nothing is playing. MemoryTrimmer throttles
+            // internally, so this costs a clock comparison on most ticks. Never while visible: the
+            // widget is animating then, and faulting its pages straight back in is the stutter
+            // this is supposed to prevent.
+            if (Widget.Visibility != Visibility.Visible)
+            {
+                MemoryTrimmer.TrimIfIdle("idle in tray");
+            }
+        };
 
         SourceInitialized += OnSourceInitialized;
     }
@@ -73,6 +85,10 @@ public partial class TaskbarWidgetWindow : Window
         {
             SetWindowVisible(false);
             _pollTimer.Interval = TimeSpan.FromMilliseconds(HiddenPollIntervalMs);
+
+            // Genuine "nothing is playing" idle — a good moment to hand back the working set the
+            // last render peak left behind. Throttled internally, so calling it on every stop is fine.
+            MemoryTrimmer.TrimIfIdle("nothing playing");
             return;
         }
 
@@ -119,6 +135,7 @@ public partial class TaskbarWidgetWindow : Window
 
         _isSetUp = true;
         _lastAppliedRect = null; // Force a fresh SetWindowPos next tick — we just got a new parent.
+        TaskbarLocator.InvalidateRectCache(); // geometry belongs to a different taskbar HWND now
         AppLog.Info("Attached widget window to taskbar.");
     }
 
@@ -222,18 +239,24 @@ public partial class TaskbarWidgetWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        // These are the only events that can actually change the taskbar's geometry, so they are
+        // also the only places the cached rect gets dropped — the poll tick deliberately reuses it
+        // rather than paying for a cross-process UI Automation read every 1.3 seconds.
         if (msg is NativeMethods.WM_DPICHANGED or NativeMethods.WM_DPICHANGED_AFTERPARENT)
         {
+            TaskbarLocator.InvalidateRectCache();
             TryReposition();
         }
         else if (msg == NativeMethods.WM_DISPLAYCHANGE)
         {
+            TaskbarLocator.InvalidateRectCache();
             TryReposition();
         }
         else if (msg == NativeMethods.WM_SETTINGCHANGE)
         {
             if ((int)(long)wParam == NativeMethods.SPI_SETWORKAREA)
             {
+                TaskbarLocator.InvalidateRectCache();
                 TryReposition();
             }
 

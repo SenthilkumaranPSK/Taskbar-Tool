@@ -9,7 +9,7 @@ namespace TaskbarMediaWidget.Core;
 /// </summary>
 internal sealed class SingleInstanceGuard : IDisposable
 {
-    private const string MutexName = @"Local\TaskbarMediaWidget_SingleInstance";
+    private const string MutexName = @"Local\TaskbarTool_SingleInstance";
 
     private Mutex? _mutex;
     private bool _owned;

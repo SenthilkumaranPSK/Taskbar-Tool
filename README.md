@@ -1,5 +1,6 @@
-# TaskbarMediaWidget
+# Taskbar Tool
 
+![version](https://img.shields.io/badge/version-1.1.0-brightgreen)
 ![platform](https://img.shields.io/badge/platform-Windows%2011-0078D6?logo=windows11&logoColor=white)
 ![framework](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)
 ![ui](https://img.shields.io/badge/UI-WPF-informational)
@@ -35,7 +36,22 @@ This is a from-scratch reimplementation of the *technique*, inspired by studying
 - Windows 11
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (targets `net10.0-windows10.0.22000.0` — the Windows SDK contract needed for the SMTC WinRT APIs)
 
-## Build & run
+.NET is only needed to *build*. The published .exe is self-contained and runs on a machine with no .NET installed.
+
+## Install
+
+```powershell
+dotnet publish src/TaskbarMediaWidget/TaskbarMediaWidget.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64 -o dist
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+This installs to `%LOCALAPPDATA%\Programs\Taskbar Tool`, adds a Start Menu shortcut, and launches the app — all per-user, no elevation. `install.ps1 -Uninstall` reverses it.
+
+Autostart is not configured by the installer on purpose: use the tray icon's **Run at startup** item, so there's one source of truth that stays in sync with Task Manager's Startup tab.
+
+> The published .exe is ~231 MB because it bundles the .NET runtime **uncompressed** — compression would roughly halve the file but cost ~40 MB of extra RAM at runtime, since a compressed bundle can't be memory-mapped. See [`CLAUDE.md`](CLAUDE.md) for the measurements.
+
+## Build & run (development)
 
 ```powershell
 dotnet build Taskbar-Tool.slnx
@@ -51,7 +67,8 @@ The app has no visible main window — it's tray-only. Right-click the tray icon
 | Piece | Responsibility |
 |---|---|
 | `Taskbar/TaskbarWidgetWindow.xaml.cs` | Reparents itself into `Shell_TrayWnd`; a self-healing poll (1.3s while visible, 5s while hidden) plus DPI/display-change hooks keeps it positioned and re-attaches after Explorer restarts |
-| `Taskbar/TaskbarLocator.cs` | Resolves the taskbar's handle, DPI, and precise client rect |
+| `Taskbar/TaskbarLocator.cs` | Resolves the taskbar's handle, DPI, and precise client rect — caching the rect and doing its UI Automation work off the UI thread |
+| `Core/MemoryTrimmer.cs` | Returns the idle working set to the OS, throttled and only while the widget is hidden |
 | `Media/MediaSessionService.cs` | Wraps [`WindowsMediaController`](https://github.com/DubyaDude/WindowsMediaController) (an SMTC wrapper) and picks one active session: focused → else playing → else whatever's available |
 | `Media/ThumbnailConverter.cs` | Decodes an SMTC thumbnail stream into a WPF `BitmapImage` |
 | `Media/AccentColorExtractor.cs` | Reduces that thumbnail to one vibrant color (weighted hue histogram) for the pill tint |
@@ -59,6 +76,18 @@ The app has no visible main window — it's tray-only. Right-click the tray icon
 | `Tray/TrayIconService.cs` | The only visible chrome — a tray icon with "Run at startup" and "Exit" |
 
 Full architectural notes, gotchas, and the reasoning behind non-obvious decisions live in [`CLAUDE.md`](CLAUDE.md).
+
+## Resource usage
+
+Measured on the v1.1 build, running in the tray:
+
+| | |
+|---|---|
+| CPU (steady state) | 0.00% |
+| Working set | ~69–99 MB (lower end with the widget hidden) |
+| Disk (installed .exe) | ~231 MB |
+
+Expect a brief CPU spike in the first ~30 seconds after launch — that's single-file startup, JIT warm-up and the first render, not the steady state.
 
 ## Known limitations
 

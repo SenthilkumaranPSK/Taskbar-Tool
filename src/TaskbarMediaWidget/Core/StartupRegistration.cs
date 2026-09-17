@@ -13,7 +13,15 @@ namespace TaskbarMediaWidget.Core;
 internal static class StartupRegistration
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "TaskbarMediaWidget";
+    private const string ValueName = "Taskbar Tool";
+
+    // The pre-1.1 value name. Removed whenever the toggle is touched, so upgrading from an older
+    // build can't leave two Run entries both launching the widget at logon.
+    private const string LegacyValueName = "TaskbarMediaWidget";
+
+    // Must track <AssemblyName> in the .csproj.
+    private const string ExecutableName = "TaskbarTool.exe";
+    private const string AssemblyFileName = "TaskbarTool.dll";
 
     /// <summary>
     /// True only when the Run entry points at <em>this</em> executable. A stale entry left behind
@@ -52,6 +60,8 @@ internal static class StartupRegistration
                 return false;
             }
 
+            key.DeleteValue(LegacyValueName, throwOnMissingValue: false);
+
             if (enabled)
             {
                 key.SetValue(ValueName, BuildLaunchCommand(), RegistryValueKind.String);
@@ -76,17 +86,18 @@ internal static class StartupRegistration
     /// repo lives under paths with spaces ("My Codzz"), and an unquoted Run value is parsed at the
     /// first space.
     ///
-    /// Normally this is just the apphost .exe. The dotnet-host case matters during development:
-    /// launched as `dotnet TaskbarMediaWidget.dll`, ProcessPath is dotnet.exe, and registering
-    /// that alone would produce an entry that starts the SDK host with no assembly and silently
-    /// does nothing — so pass the managed assembly along with it.
+    /// Normally this is just the apphost .exe (published or built), which is what ProcessPath
+    /// reports. The dotnet-host case matters during development: launched as
+    /// `dotnet TaskbarTool.dll`, ProcessPath is dotnet.exe, and registering that alone would
+    /// produce an entry that starts the SDK host with no assembly and silently does nothing — so
+    /// pass the managed assembly along with it.
     /// </summary>
     private static string BuildLaunchCommand()
     {
         var processPath = Environment.ProcessPath;
         if (string.IsNullOrEmpty(processPath))
         {
-            return $"\"{AppContext.BaseDirectory}TaskbarMediaWidget.exe\"";
+            return $"\"{System.IO.Path.Combine(AppContext.BaseDirectory, ExecutableName)}\"";
         }
 
         // Fully qualified: Path is ambiguous with System.Windows.Shapes.Path in a WPF project.
@@ -96,9 +107,11 @@ internal static class StartupRegistration
             return $"\"{processPath}\"";
         }
 
-        var assemblyPath = System.Reflection.Assembly.GetEntryAssembly()?.Location;
-        return string.IsNullOrEmpty(assemblyPath)
-            ? $"\"{processPath}\""
-            : $"\"{processPath}\" \"{assemblyPath}\"";
+        // Deliberately not Assembly.Location: it returns an empty string in a single-file app
+        // (IL3000), which is exactly how this ships. BaseDirectory is correct in both layouts.
+        var assemblyPath = System.IO.Path.Combine(AppContext.BaseDirectory, AssemblyFileName);
+        return System.IO.File.Exists(assemblyPath)
+            ? $"\"{processPath}\" \"{assemblyPath}\""
+            : $"\"{processPath}\"";
     }
 }

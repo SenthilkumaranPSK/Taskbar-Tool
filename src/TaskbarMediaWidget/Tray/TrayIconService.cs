@@ -36,7 +36,7 @@ internal sealed class TrayIconService : IDisposable
         _notifyIcon = new NotifyIcon
         {
             Icon = _ownedIcon ?? SystemIcons.Application,
-            Text = "Taskbar Media Widget",
+            Text = "Taskbar Tool",
             ContextMenuStrip = menu,
             Visible = true,
         };
@@ -55,7 +55,7 @@ internal sealed class TrayIconService : IDisposable
         _startupItem.Checked = StartupRegistration.IsEnabled();
         _notifyIcon.ShowBalloonTip(
             3000,
-            "Taskbar Media Widget",
+            "Taskbar Tool",
             "Couldn't update the startup setting. See the log for details.",
             ToolTipIcon.Warning);
     }

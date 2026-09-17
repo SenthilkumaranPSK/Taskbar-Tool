@@ -14,7 +14,7 @@ internal static class AppLog
 
     private static readonly string LogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "TaskbarMediaWidget",
+        "Taskbar Tool",
         "log.txt");
 
     private static readonly object WriteLock = new();

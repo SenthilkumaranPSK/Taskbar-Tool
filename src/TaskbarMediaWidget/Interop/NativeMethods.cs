@@ -66,6 +66,15 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern uint RegisterWindowMessage(string lpString);
 
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GetCurrentProcess();
+
+    // Passing -1 for both bounds is the documented way to ask the memory manager to trim the
+    // process's working set to what it is actually touching. See Core/MemoryTrimmer.
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr dwMinimumWorkingSetSize, IntPtr dwMaximumWorkingSetSize);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {

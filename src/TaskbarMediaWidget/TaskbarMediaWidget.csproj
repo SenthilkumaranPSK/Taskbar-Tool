@@ -8,12 +8,62 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>TaskbarMediaWidget</RootNamespace>
     <StartupObject>TaskbarMediaWidget.App</StartupObject>
-    <AssemblyName>TaskbarMediaWidget</AssemblyName>
+    <AssemblyName>TaskbarTool</AssemblyName>
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!--
+    Product identity. These are what Explorer's Properties > Details tab, Task Manager's process
+    list, and Settings > Apps show — the assembly name alone (TaskbarTool) would otherwise be the
+    only user-visible name anywhere.
+  -->
+  <PropertyGroup>
+    <Product>Taskbar Tool</Product>
+    <AssemblyTitle>Taskbar Tool</AssemblyTitle>
+    <Description>Now-playing media widget embedded in the Windows 11 taskbar.</Description>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <InformationalVersion>1.1.0</InformationalVersion>
+  </PropertyGroup>
+
+  <!--
+    Runtime tuning for a process that sits idle in the tray for days at a time.
+
+    Server GC would reserve per-core heaps for an app that allocates almost nothing; background
+    (concurrent) GC costs a dedicated thread and extra committed memory to avoid pauses this app's
+    tiny heap will never notice. Workstation + non-concurrent is both smaller and, here, no less
+    responsive. TieredPGO lets the steady-state hot path (the poll tick) re-optimize once real
+    usage patterns are known.
+  -->
+  <PropertyGroup>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <!--
+    Publish shape: one self-contained .exe that runs on a machine with no .NET installed.
+    SelfContained and the RID are passed on the command line rather than set here, because
+    SelfContained in the project file would also apply to a plain `dotnet build` (which has no
+    RuntimeIdentifier) and break it. See the publish command in README.md.
+  -->
+  <PropertyGroup>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!--
+      EnableCompressionInSingleFile is deliberately OFF. It shrinks the .exe on disk, but a
+      compressed bundle cannot be memory-mapped: the runtime has to decompress every assembly it
+      touches into private memory, which measured ~116 MB resident here versus a memory-mapped
+      layout. Disk is cheap and RAM is the thing this app is judged on, so the bigger file wins.
+    -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,7 +81,7 @@
   </ItemGroup>
 
   <!--
-    UIAutomationClient/UIAutomationTypes (used to locate the Start/Widgets/taskbar-frame elements)
+    UIAutomationClient/UIAutomationTypes (used to locate the taskbar-frame element)
     are already pulled in implicitly by UseWPF — no explicit <Reference> needed, and adding one
     caused an unresolved-duplicate-reference warning.
   -->

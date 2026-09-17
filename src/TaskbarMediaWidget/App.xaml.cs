@@ -12,6 +12,11 @@ public partial class App : System.Windows.Application
     private const int ExplorerReadyPollIntervalMs = 200;
     private const int ExplorerReadyTimeoutMs = 60_000;
 
+    // WPF's startup cost (XAML parse, first layout/render, JIT) leaves a working set much larger
+    // than the steady state needs, and an idle tray process never comes under the memory pressure
+    // that would reclaim it. Trim once the startup burst has settled.
+    private const int StartupSettleMs = 15_000;
+
     private SingleInstanceGuard? _instanceGuard;
     private MediaSessionService? _mediaSessionService;
     private TrayIconService? _trayIconService;
@@ -39,7 +44,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        AppLog.Info("Starting TaskbarMediaWidget.");
+        AppLog.Info("Starting Taskbar Tool.");
 
         _mediaSessionService = new MediaSessionService();
         _trayIconService = new TrayIconService();
@@ -55,6 +60,24 @@ public partial class App : System.Windows.Application
         // TaskbarWidgetWindow.OnSourceInitialized), so there's no visible empty-box moment either way.
         _mediaSessionService.Start();
         CreateWidgetWindow();
+
+        ScheduleStartupTrim();
+    }
+
+    private void ScheduleStartupTrim()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.ApplicationIdle)
+        {
+            Interval = TimeSpan.FromMilliseconds(StartupSettleMs),
+        };
+
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            MemoryTrimmer.TrimIfIdle("startup settled");
+        };
+
+        timer.Start();
     }
 
     private void CreateWidgetWindow()

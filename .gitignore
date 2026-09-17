@@ -369,3 +369,6 @@ FodyWeavers.xsd
 .vscode/
 
 Website/tailwindcss.exe
+
+# Published output of install.ps1 (self-contained single-file exe, ~90 MB — never commit)
+dist/
