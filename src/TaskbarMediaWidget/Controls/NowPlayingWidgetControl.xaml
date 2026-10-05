@@ -5,17 +5,20 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              Height="32"
-             d:DesignWidth="230"
+             d:DesignWidth="250"
              Cursor="Hand"
              PreviewMouseWheel="OnPreviewMouseWheel"
-             PreviewMouseDown="OnPreviewMouseDown">
+             PreviewMouseDown="OnPreviewMouseDown"
+             MouseEnter="OnMouseEnter"
+             MouseLeave="OnMouseLeave">
     <UserControl.Resources>
         <SolidColorBrush x:Key="PrimaryTextBrush" Color="White" />
-        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#BBFFFFFF" />
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#B8FFFFFF" />
         <SolidColorBrush x:Key="HoverBrush" Color="#22FFFFFF" />
         <SolidColorBrush x:Key="AccentBrush" Color="#60CDFF" />
         <SolidColorBrush x:Key="PillBaseBgBrush" Color="#16FFFFFF" />
-        <SolidColorBrush x:Key="PillBaseBorderBrush" Color="#25FFFFFF" />
+        <SolidColorBrush x:Key="PillHoverBgBrush" Color="#28FFFFFF" />
+        <SolidColorBrush x:Key="PillBaseBorderBrush" Color="#22FFFFFF" />
 
         <Style x:Key="TransportButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="24" />
@@ -24,19 +27,24 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="FontFamily" Value="Segoe Fluent Icons" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bg" Background="Transparent" CornerRadius="4">
+                        <Border x:Name="Bg" Background="Transparent" CornerRadius="5">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}" />
                             </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bg" Property="Opacity" Value="0.7" />
+                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.35" />
+                                <Setter Property="Opacity" Value="0.3" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -50,7 +58,7 @@
         <Border x:Name="PillBorder" CornerRadius="8" BorderThickness="1"
                 Background="{DynamicResource PillBaseBgBrush}"
                 BorderBrush="{DynamicResource PillBaseBorderBrush}">
-            <Grid x:Name="RootGrid" Background="Transparent">
+            <Grid x:Name="RootGrid" Background="Transparent" Margin="2,0,2,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -59,46 +67,46 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Cover Art or Music Icon -->
-                <Border Grid.Column="0" Width="24" Height="24" Margin="4,0,5,0" CornerRadius="4" ClipToBounds="True" Background="#1AFFFFFF">
+                <Border Grid.Column="0" Width="24" Height="24" Margin="3,0,5,0" CornerRadius="5" ClipToBounds="True" Background="#20FFFFFF">
                     <Grid>
                         <TextBlock x:Name="ArtFallback" Text="" FontFamily="Segoe Fluent Icons" FontSize="13"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    Foreground="{DynamicResource AccentBrush}" />
-                        <Image x:Name="CoverArt" Stretch="UniformToFill" />
+                        <Image x:Name="CoverArt" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
                     </Grid>
                 </Border>
 
                 <!-- Mini Animated Equalizer Bars -->
-                <StackPanel x:Name="EqualizerBars" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0" Visibility="Collapsed" Height="14">
-                    <Border x:Name="EqBar1" Width="2" Height="6" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="EqBar2" Width="2" Height="12" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1,0" VerticalAlignment="Bottom" />
+                <StackPanel x:Name="EqualizerBars" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Collapsed" Height="14">
+                    <Border x:Name="EqBar1" Width="2" Height="6" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1.5,0" VerticalAlignment="Bottom" />
+                    <Border x:Name="EqBar2" Width="2" Height="12" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1.5,0" VerticalAlignment="Bottom" />
                     <Border x:Name="EqBar3" Width="2" Height="8" Background="{DynamicResource AccentBrush}" CornerRadius="1" VerticalAlignment="Bottom" />
                 </StackPanel>
 
                 <!-- Marquee Text Stack -->
-                <Canvas x:Name="TextClip" Grid.Column="2" ClipToBounds="True" Width="105">
+                <Canvas x:Name="TextClip" Grid.Column="2" ClipToBounds="True" Width="125">
                     <StackPanel x:Name="TextStack" Orientation="Vertical" Canvas.Left="0" Canvas.Top="1">
                         <TextBlock x:Name="TitleText" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="11" FontWeight="SemiBold"
                                    AutomationProperties.LiveSetting="Polite" />
-                        <TextBlock x:Name="ArtistText" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="10" />
+                        <TextBlock x:Name="ArtistText" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="9.5" />
                     </StackPanel>
                 </Canvas>
 
                 <!-- Transport Buttons -->
-                <StackPanel x:Name="TransportPanel" Grid.Column="3" Orientation="Horizontal" Margin="4,0,4,0">
+                <StackPanel x:Name="TransportPanel" Grid.Column="3" Orientation="Horizontal" Margin="3,0,2,0">
                     <Button x:Name="PreviousButton" Style="{StaticResource TransportButtonStyle}" Click="PreviousButton_Click"
-                            Content="&#xE892;" AutomationProperties.Name="Previous track" />
+                            Content="&#xE892;" AutomationProperties.Name="Previous track" ToolTip="Previous Track" />
                     <Button x:Name="PlayPauseButton" Style="{StaticResource TransportButtonStyle}" Click="PlayPauseButton_Click"
-                            Content="&#xE769;" AutomationProperties.Name="Pause" />
+                            Content="&#xE769;" AutomationProperties.Name="Pause" ToolTip="Play / Pause" />
                     <Button x:Name="NextButton" Style="{StaticResource TransportButtonStyle}" Click="NextButton_Click"
-                            Content="&#xE893;" AutomationProperties.Name="Next track" />
+                            Content="&#xE893;" AutomationProperties.Name="Next track" ToolTip="Next Track" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- Bottom 2px Track Progress Bar -->
-        <Grid x:Name="ProgressBarTrack" VerticalAlignment="Bottom" Height="2" Margin="7,0,7,1" Visibility="Collapsed">
-            <Border Background="#25FFFFFF" CornerRadius="1" />
+        <Grid x:Name="ProgressBarTrack" VerticalAlignment="Bottom" Height="2" Margin="8,0,8,1" Visibility="Collapsed">
+            <Border Background="#20FFFFFF" CornerRadius="1" />
             <Border x:Name="ProgressBarFill" HorizontalAlignment="Left" Width="0" Background="{DynamicResource AccentBrush}" CornerRadius="1" />
         </Grid>
     </Grid>

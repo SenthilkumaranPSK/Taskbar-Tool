@@ -99,7 +99,7 @@ public partial class App : System.Windows.Application
         _widgetWindow.PreviousRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PreviousAsync());
         _widgetWindow.PlayPauseRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PlayPauseAsync());
         _widgetWindow.NextRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.NextAsync());
-        _widgetWindow.FlyoutToggleRequested += (x, y) => _flyoutWindow?.ToggleFlyout(x, y);
+        _widgetWindow.FlyoutToggleRequested += (_, _) => _flyoutWindow?.ToggleFlyout(fromTray: false);
 
         if (_mediaSessionService is not null)
         {
@@ -117,22 +117,7 @@ public partial class App : System.Windows.Application
 
     private void ShowFlyoutFromTray()
     {
-        if (_flyoutWindow is null)
-        {
-            return;
-        }
-
-        if (_widgetWindow is not null)
-        {
-            var (x, y) = _widgetWindow.GetWidgetScreenPosition();
-            _flyoutWindow.ToggleFlyout(x, y);
-        }
-        else
-        {
-            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
-            _flyoutWindow.ToggleFlyout(screenWidth - 370, screenHeight - 60);
-        }
+        _flyoutWindow?.ToggleFlyout(fromTray: true);
     }
 
     // Transport-control clicks were previously fired with "_ = ...Async()" directly — any fault

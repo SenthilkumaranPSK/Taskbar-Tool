@@ -39,7 +39,7 @@ public partial class TaskbarWidgetWindow : Window
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
-    public event Action<int, int>? FlyoutToggleRequested;
+    public event EventHandler? FlyoutToggleRequested;
 
     public TaskbarWidgetWindow()
     {
@@ -51,11 +51,7 @@ public partial class TaskbarWidgetWindow : Window
         Widget.PreviousRequested += (_, _) => PreviousRequested?.Invoke(this, EventArgs.Empty);
         Widget.PlayPauseRequested += (_, _) => PlayPauseRequested?.Invoke(this, EventArgs.Empty);
         Widget.NextRequested += (_, _) => NextRequested?.Invoke(this, EventArgs.Empty);
-        Widget.FlyoutToggleRequested += (_, _) =>
-        {
-            var (x, y) = GetWidgetScreenPosition();
-            FlyoutToggleRequested?.Invoke(x, y);
-        };
+        Widget.FlyoutToggleRequested += (_, _) => FlyoutToggleRequested?.Invoke(this, EventArgs.Empty);
 
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {

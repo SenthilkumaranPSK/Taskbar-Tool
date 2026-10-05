@@ -91,14 +91,14 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
             ProgressBarTrack.Visibility = Visibility.Collapsed;
             TransportPanel.Visibility = Visibility.Collapsed;
 
-            TitleText.Text = "Taskbar Tool";
-            ArtistText.Text = "Ready • Click to open";
+            TitleText.Text = "No Media";
+            ArtistText.Text = "Ready • Click for controls";
             ToolTip = "Taskbar Tool\nNo media playing\nClick to open controls";
 
-            if (_lastTitle != "Taskbar Tool")
+            if (_lastTitle != "No Media")
             {
-                _lastTitle = "Taskbar Tool";
-                _lastArtist = "Ready • Click to open";
+                _lastTitle = "No Media";
+                _lastArtist = "Ready • Click for controls";
                 ContentVersion++;
             }
 
@@ -135,9 +135,9 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 
         // Tooltip feedback
         var timeStr = info.Duration > TimeSpan.Zero
-            ? $"{NowPlayingInfo.FormatTime(info.CurrentPosition)} / {NowPlayingInfo.FormatTime(info.Duration)}"
+            ? $"\n⏱ {NowPlayingInfo.FormatTime(info.CurrentPosition)} / {NowPlayingInfo.FormatTime(info.Duration)}"
             : string.Empty;
-        ToolTip = $"[{info.SourceApp}] {title}\n{info.Artist}{(string.IsNullOrEmpty(timeStr) ? "" : "\n" + timeStr)}\n• Scroll: Volume\n• Click: Open Flyout";
+        ToolTip = $"🎵 {title}\n👤 {info.Artist}{timeStr}\n🔊 Scroll: Volume | Left Click: Open Controls";
 
         // Equalizer animation
         EqualizerBars.Visibility = Visibility.Visible;
@@ -230,12 +230,16 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
             : System.Windows.Media.Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
 
         Resources["PillBaseBgBrush"] = new SolidColorBrush(isLightTheme
-            ? System.Windows.Media.Color.FromArgb(0x18, 0x00, 0x00, 0x00)
-            : System.Windows.Media.Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
+            ? System.Windows.Media.Color.FromArgb(0x16, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF));
 
-        Resources["PillBaseBorderBrush"] = new SolidColorBrush(isLightTheme
+        Resources["PillHoverBgBrush"] = new SolidColorBrush(isLightTheme
             ? System.Windows.Media.Color.FromArgb(0x28, 0x00, 0x00, 0x00)
             : System.Windows.Media.Color.FromArgb(0x28, 0xFF, 0xFF, 0xFF));
+
+        Resources["PillBaseBorderBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0x22, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
 
         ApplyAccent(_accentColor, force: true);
     }
@@ -413,4 +417,20 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
     private void PlayPauseButton_Click(object sender, RoutedEventArgs e) => PlayPauseRequested?.Invoke(this, EventArgs.Empty);
 
     private void NextButton_Click(object sender, RoutedEventArgs e) => NextRequested?.Invoke(this, EventArgs.Empty);
+
+    private void OnMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_accentColor is null)
+        {
+            PillBorder.Background = (System.Windows.Media.Brush)Resources["PillHoverBgBrush"];
+        }
+    }
+
+    private void OnMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_accentColor is null)
+        {
+            PillBorder.Background = (System.Windows.Media.Brush)Resources["PillBaseBgBrush"];
+        }
+    }
 }

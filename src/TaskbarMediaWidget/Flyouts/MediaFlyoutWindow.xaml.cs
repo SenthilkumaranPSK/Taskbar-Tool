@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using TaskbarMediaWidget.Core;
 using TaskbarMediaWidget.Interop;
 using TaskbarMediaWidget.Media;
 
@@ -34,6 +36,14 @@ public partial class MediaFlyoutWindow : Window
         _progressTimer.Tick += OnProgressTimerTick;
 
         Deactivated += (_, _) => Hide();
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape)
+            {
+                Hide();
+            }
+        };
+
         ApplyTheme(ThemeDetector.IsSystemLightTheme());
     }
 
@@ -43,12 +53,13 @@ public partial class MediaFlyoutWindow : Window
 
         if (info is null)
         {
-            TrackTitleText.Text = "Not playing";
-            ArtistText.Text = "No active media session";
+            TrackTitleText.Text = "Not Playing";
+            ArtistText.Text = "Start media playback to see controls";
             AlbumText.Text = string.Empty;
-            SourceAppText.Text = "Media Player";
+            SourceAppText.Text = "Media";
             CoverArtImage.Source = null;
             ArtFallbackGlyph.Visibility = Visibility.Visible;
+            CoverArtGlow.Visibility = Visibility.Collapsed;
             SeekSlider.IsEnabled = false;
             SeekSlider.Value = 0;
             CurrentTimeText.Text = "0:00";
@@ -61,17 +72,19 @@ public partial class MediaFlyoutWindow : Window
         TrackTitleText.Text = string.IsNullOrWhiteSpace(info.Title) ? "Unknown Track" : info.Title;
         ArtistText.Text = string.IsNullOrWhiteSpace(info.Artist) ? "Unknown Artist" : info.Artist;
         AlbumText.Text = info.AlbumTitle;
-        SourceAppText.Text = info.SourceApp;
+        SourceAppText.Text = string.IsNullOrWhiteSpace(info.SourceApp) ? "Media Player" : info.SourceApp;
 
         if (info.Thumbnail is not null)
         {
             CoverArtImage.Source = info.Thumbnail;
             ArtFallbackGlyph.Visibility = Visibility.Collapsed;
+            CoverArtGlow.Visibility = Visibility.Visible;
         }
         else
         {
             CoverArtImage.Source = null;
             ArtFallbackGlyph.Visibility = Visibility.Visible;
+            CoverArtGlow.Visibility = Visibility.Collapsed;
         }
 
         PlayPauseButton.Content = info.IsPlaying ? PauseGlyph : PlayGlyph;
@@ -99,10 +112,24 @@ public partial class MediaFlyoutWindow : Window
             _progressTimer.Stop();
         }
 
-        if (info.AccentColor is { } accent)
-        {
-            Resources["AccentBrush"] = new SolidColorBrush(accent);
-        }
+        ApplyAccentColor(info.AccentColor);
+    }
+
+    private void ApplyAccentColor(System.Windows.Media.Color? accent)
+    {
+        var color = accent ?? System.Windows.Media.Color.FromRgb(0x60, 0xCD, 0xFF);
+        var accentBrush = new SolidColorBrush(color);
+        accentBrush.Freeze();
+
+        Resources["AccentBrush"] = accentBrush;
+        Resources["PlayButtonBgBrush"] = accentBrush;
+
+        // Choose foreground for play button based on accent brightness
+        var luminance = (0.299 * color.R + 0.587 * color.G + 0.114 * color.B) / 255.0;
+        var fg = luminance > 0.55 ? Colors.Black : Colors.White;
+        var fgBrush = new SolidColorBrush(fg);
+        fgBrush.Freeze();
+        Resources["PlayButtonFgBrush"] = fgBrush;
     }
 
     private void OnProgressTimerTick(object? sender, EventArgs e)
@@ -134,28 +161,49 @@ public partial class MediaFlyoutWindow : Window
         }
     }
 
-    public void PositionAbove(int screenX, int screenY)
+    /// <summary>
+    /// Computes window position in logical DIPs directly from SystemParameters.WorkArea
+    /// so the flyout is always 100% visible right above the taskbar, regardless of display DPI scale.
+    /// </summary>
+    public void PositionAbove(bool fromTray = false)
     {
         Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
-        var width = DesiredSize.Width > 0 ? DesiredSize.Width : 350;
-        var height = DesiredSize.Height > 0 ? DesiredSize.Height : 220;
+        var width = ActualWidth > 0 ? ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 360);
+        var height = ActualHeight > 0 ? ActualHeight : (DesiredSize.Height > 0 ? DesiredSize.Height : 280);
 
-        var screenWidth = SystemParameters.PrimaryScreenWidth;
-        var screenHeight = SystemParameters.PrimaryScreenHeight;
+        var workArea = SystemParameters.WorkArea;
 
-        var targetLeft = Math.Max(12, Math.Min(screenX, screenWidth - width - 12));
-        var targetTop = Math.Max(12, screenY - height - 8);
+        // Exactly 10px above the taskbar (bottom of the work area in DIPs)
+        var targetTop = workArea.Bottom - height - 10;
 
-        Left = targetLeft;
-        Top = targetTop;
+        double targetLeft;
+        if (fromTray)
+        {
+            targetLeft = workArea.Right - width - 12;
+        }
+        else
+        {
+            targetLeft = workArea.Left + 12;
+        }
+
+        Left = Math.Max(workArea.Left + 8, Math.Min(targetLeft, workArea.Right - width - 8));
+        Top = Math.Max(workArea.Top + 8, targetTop);
     }
 
-    public void ShowFlyout(int screenX, int screenY)
+    public void ShowFlyout(bool fromTray = false)
     {
         ApplyTheme(ThemeDetector.IsSystemLightTheme());
-        PositionAbove(screenX, screenY);
+        PositionAbove(fromTray);
+
+        Opacity = 0;
         Show();
         Activate();
+
+        var anim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+        };
+        BeginAnimation(OpacityProperty, anim);
 
         if (_currentInfo?.IsPlaying == true)
         {
@@ -163,7 +211,7 @@ public partial class MediaFlyoutWindow : Window
         }
     }
 
-    public void ToggleFlyout(int screenX, int screenY)
+    public void ToggleFlyout(bool fromTray = false)
     {
         if (IsVisible)
         {
@@ -171,34 +219,38 @@ public partial class MediaFlyoutWindow : Window
         }
         else
         {
-            ShowFlyout(screenX, screenY);
+            ShowFlyout(fromTray);
         }
     }
 
     public void ApplyTheme(bool isLightTheme)
     {
         Resources["FlyoutBgBrush"] = new SolidColorBrush(isLightTheme
-            ? System.Windows.Media.Color.FromArgb(0xF4, 0xF5, 0xF5, 0xF5)
-            : System.Windows.Media.Color.FromArgb(0xF4, 0x1E, 0x1E, 0x1E));
+            ? System.Windows.Media.Color.FromArgb(0xF8, 0xF8, 0xF8, 0xF8)
+            : System.Windows.Media.Color.FromArgb(0xF4, 0x1E, 0x1E, 0x20));
 
         Resources["FlyoutBorderBrush"] = new SolidColorBrush(isLightTheme
-            ? System.Windows.Media.Color.FromArgb(0x33, 0x00, 0x00, 0x00)
-            : System.Windows.Media.Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
+            ? System.Windows.Media.Color.FromArgb(0x28, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x2B, 0xFF, 0xFF, 0xFF));
 
-        Resources["PrimaryTextBrush"] = new SolidColorBrush(isLightTheme ? Colors.Black : Colors.White);
+        Resources["PrimaryTextBrush"] = new SolidColorBrush(isLightTheme ? System.Windows.Media.Color.FromRgb(0x18, 0x18, 0x18) : Colors.White);
         Resources["SecondaryTextBrush"] = new SolidColorBrush(isLightTheme
-            ? System.Windows.Media.Color.FromArgb(0xA0, 0x00, 0x00, 0x00)
-            : System.Windows.Media.Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF));
+            ? System.Windows.Media.Color.FromArgb(0xBB, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0xB8, 0xFF, 0xFF, 0xFF));
+        Resources["TertiaryTextBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0x7A, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x7A, 0xFF, 0xFF, 0xFF));
 
-        Resources["HoverBrush"] = new SolidColorBrush(isLightTheme
-            ? System.Windows.Media.Color.FromArgb(0x18, 0x00, 0x00, 0x00)
-            : System.Windows.Media.Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
+        Resources["ButtonHoverBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0x14, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x1E, 0xFF, 0xFF, 0xFF));
+
+        Resources["PillBadgeBgBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0x12, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF));
     }
 
-    private void SeekSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        _isDraggingSlider = true;
-    }
+    private void SeekSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e) => _isDraggingSlider = true;
 
     private void SeekSlider_PreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
@@ -215,6 +267,12 @@ public partial class MediaFlyoutWindow : Window
     private void ShuffleButton_Click(object sender, RoutedEventArgs e) => ShuffleRequested?.Invoke(this, EventArgs.Empty);
 
     private void RepeatButton_Click(object sender, RoutedEventArgs e) => RepeatRequested?.Invoke(this, EventArgs.Empty);
+
+    private void VolumeMuteButton_Click(object sender, RoutedEventArgs e) => VolumeHelper.ToggleMute();
+
+    private void VolumeDownButton_Click(object sender, RoutedEventArgs e) => VolumeHelper.VolumeDown();
+
+    private void VolumeUpButton_Click(object sender, RoutedEventArgs e) => VolumeHelper.VolumeUp();
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
 

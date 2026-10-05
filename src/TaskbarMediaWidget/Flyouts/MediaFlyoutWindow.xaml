@@ -8,35 +8,44 @@
         ShowInTaskbar="False"
         Topmost="True"
         ResizeMode="NoResize"
-        Width="350"
+        Width="360"
         SizeToContent="Height"
         Focusable="True"
         ShowActivated="True"
         WindowStartupLocation="Manual">
     <Window.Resources>
-        <SolidColorBrush x:Key="FlyoutBgBrush" Color="#F2202020" />
-        <SolidColorBrush x:Key="FlyoutBorderBrush" Color="#33FFFFFF" />
-        <SolidColorBrush x:Key="PrimaryTextBrush" Color="White" />
-        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#A0FFFFFF" />
+        <SolidColorBrush x:Key="FlyoutBgBrush" Color="#F41E1E20" />
+        <SolidColorBrush x:Key="FlyoutBorderBrush" Color="#2BFFFFFF" />
+        <SolidColorBrush x:Key="FlyoutTopHighlightBrush" Color="#38FFFFFF" />
+        <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#B8FFFFFF" />
+        <SolidColorBrush x:Key="TertiaryTextBrush" Color="#7AFFFFFF" />
         <SolidColorBrush x:Key="AccentBrush" Color="#60CDFF" />
-        <SolidColorBrush x:Key="HoverBrush" Color="#22FFFFFF" />
-        <SolidColorBrush x:Key="ActiveControlBrush" Color="#4060CDFF" />
+        <SolidColorBrush x:Key="PlayButtonBgBrush" Color="#60CDFF" />
+        <SolidColorBrush x:Key="PlayButtonFgBrush" Color="#000000" />
+        <SolidColorBrush x:Key="ButtonHoverBrush" Color="#1EFFFFFF" />
+        <SolidColorBrush x:Key="PillBadgeBgBrush" Color="#1AFFFFFF" />
 
+        <!-- Standard Button Style -->
         <Style x:Key="FlyoutButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="FontFamily" Value="Segoe Fluent Icons" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.7" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.3" />
@@ -47,11 +56,46 @@
             </Setter>
         </Style>
 
-        <Style x:Key="SeekSliderStyle" TargetType="Slider">
+        <!-- Primary Hero Button Style (Play/Pause) -->
+        <Style x:Key="PrimaryHeroButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource PlayButtonBgBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource PlayButtonFgBrush}" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="24">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270" Opacity="0.3" Color="Black" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.9" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.75" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern Fluent 2 Slider Style -->
+        <Style x:Key="FluentSliderStyle" TargetType="Slider">
             <Setter Property="Stylus.IsPressAndHoldEnabled" Value="False" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Height" Value="24" />
+            <Setter Property="Height" Value="22" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
@@ -70,7 +114,7 @@
                                     <RepeatButton Command="Slider.IncreaseLarge">
                                         <RepeatButton.Template>
                                             <ControlTemplate>
-                                                <Border Height="4" Background="#33FFFFFF" CornerRadius="0,2,2,0" />
+                                                <Border Height="4" Background="#26FFFFFF" CornerRadius="0,2,2,0" />
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
@@ -79,7 +123,14 @@
                                     <Thumb x:Name="Thumb">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Ellipse Width="12" Height="12" Fill="{DynamicResource PrimaryTextBrush}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" />
+                                                <Grid Width="16" Height="16">
+                                                    <Ellipse Width="12" Height="12" Fill="{DynamicResource PrimaryTextBrush}">
+                                                        <Ellipse.Effect>
+                                                            <DropShadowEffect BlurRadius="4" ShadowDepth="1" Direction="270" Opacity="0.3" Color="Black" />
+                                                        </Ellipse.Effect>
+                                                    </Ellipse>
+                                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" />
+                                                </Grid>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -92,79 +143,117 @@
         </Style>
     </Window.Resources>
 
-    <Border Margin="12" CornerRadius="12" Background="{DynamicResource FlyoutBgBrush}"
+    <!-- Main Outer Container with Drop Shadow -->
+    <Border x:Name="FlyoutRootBorder" Margin="14" CornerRadius="14"
+            Background="{DynamicResource FlyoutBgBrush}"
             BorderBrush="{DynamicResource FlyoutBorderBrush}" BorderThickness="1">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black" />
+            <DropShadowEffect BlurRadius="28" ShadowDepth="6" Direction="270" Opacity="0.45" Color="Black" />
         </Border.Effect>
-        <Grid Margin="16">
+
+        <Grid Margin="16,14,16,14">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" /> <!-- Header -->
-                <RowDefinition Height="Auto" /> <!-- Art + Meta -->
-                <RowDefinition Height="Auto" /> <!-- Scrubber -->
-                <RowDefinition Height="Auto" /> <!-- Controls -->
+                <RowDefinition Height="Auto" /> <!-- 0: Top Header -->
+                <RowDefinition Height="Auto" /> <!-- 1: Hero Track Row -->
+                <RowDefinition Height="Auto" /> <!-- 2: Timeline Scrubber -->
+                <RowDefinition Height="Auto" /> <!-- 3: Transport Controls -->
+                <RowDefinition Height="Auto" /> <!-- 4: Bottom Volume Bar -->
             </Grid.RowDefinitions>
 
-            <!-- Header: App Badge & Close -->
+            <!-- 0: Header with Source App Pill & Close Button -->
             <Grid Grid.Row="0" Margin="0,0,0,12">
-                <Border HorizontalAlignment="Left" Background="#18FFFFFF" CornerRadius="4" Padding="6,2">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="" FontFamily="Segoe Fluent Icons" FontSize="11" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <TextBlock x:Name="SourceAppText" Text="Media Player" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                <Border HorizontalAlignment="Left" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Padding="8,3">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="SourceAppText" Text="Media Player" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
-                <Button x:Name="CloseButton" Style="{StaticResource FlyoutButtonStyle}" HorizontalAlignment="Right" Width="24" Height="24" Content="" FontSize="10" Click="CloseButton_Click" ToolTip="Close Flyout" />
+
+                <Button x:Name="CloseButton" Style="{StaticResource FlyoutButtonStyle}" HorizontalAlignment="Right" Width="26" Height="26" Content="" FontSize="10" Click="CloseButton_Click" ToolTip="Close (Esc)" />
             </Grid>
 
-            <!-- Art + Title / Artist / Album -->
+            <!-- 1: Hero Cover Art + Track Information -->
             <Grid Grid.Row="1" Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Width="72" Height="72" CornerRadius="8" ClipToBounds="True" Background="#18FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1">
-                    <Grid>
-                        <TextBlock x:Name="ArtFallbackGlyph" Text="" FontFamily="Segoe Fluent Icons" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" />
-                        <Image x:Name="CoverArtImage" Stretch="UniformToFill" />
-                    </Grid>
-                </Border>
+                <!-- Cover Art with Ambient Shadow -->
+                <Grid Grid.Column="0" Width="82" Height="82">
+                    <Border x:Name="CoverArtGlow" CornerRadius="10" Background="{DynamicResource AccentBrush}" Opacity="0.35">
+                        <Border.Effect>
+                            <BlurEffect Radius="14" />
+                        </Border.Effect>
+                    </Border>
+                    <Border CornerRadius="10" ClipToBounds="True" Background="#1FFFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1">
+                        <Grid>
+                            <TextBlock x:Name="ArtFallbackGlyph" Text="" FontFamily="Segoe Fluent Icons" FontSize="32"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TertiaryTextBrush}" />
+                            <Image x:Name="CoverArtImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Grid>
+                    </Border>
+                </Grid>
 
+                <!-- Track Details -->
                 <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="TrackTitleText" Text="Title" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock x:Name="ArtistText" Text="Artist" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
-                    <TextBlock x:Name="AlbumText" Text="Album" FontSize="11" Foreground="#70FFFFFF" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="TrackTitleText" Text="No Track Playing" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                    <TextBlock x:Name="ArtistText" Text="Select media to play" FontSize="12"
+                               Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                    <TextBlock x:Name="AlbumText" Text="" FontSize="11"
+                               Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                 </StackPanel>
             </Grid>
 
-            <!-- Timeline Scrubber -->
-            <Grid Grid.Row="2" Margin="0,0,0,10">
+            <!-- 2: Timeline Scrubber with Timestamps -->
+            <Grid Grid.Row="2" Margin="0,0,0,8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Slider x:Name="SeekSlider" Grid.Row="0" Style="{StaticResource SeekSliderStyle}"
+                <Slider x:Name="SeekSlider" Grid.Row="0" Style="{StaticResource FluentSliderStyle}"
                         Minimum="0" Maximum="100" Value="0"
                         PreviewMouseDown="SeekSlider_PreviewMouseDown"
                         PreviewMouseUp="SeekSlider_PreviewMouseUp" />
 
                 <Grid Grid.Row="1" Margin="2,-2,2,0">
-                    <TextBlock x:Name="CurrentTimeText" Text="0:00" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Left" />
-                    <TextBlock x:Name="TotalTimeText" Text="0:00" FontSize="11" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="CurrentTimeText" Text="0:00" FontSize="11" FontFamily="Segoe UI Variable Text, Segoe UI" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Left" />
+                    <TextBlock x:Name="TotalTimeText" Text="0:00" FontSize="11" FontFamily="Segoe UI Variable Text, Segoe UI" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" />
                 </Grid>
             </Grid>
 
-            <!-- Controls: Shuffle, Prev, Play/Pause, Next, Repeat -->
-            <Grid Grid.Row="3" HorizontalAlignment="Center">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="ShuffleButton" Style="{StaticResource FlyoutButtonStyle}" Width="32" Height="32" Content="" FontSize="14" Click="ShuffleButton_Click" ToolTip="Shuffle" Margin="0,0,8,0" />
-                    <Button x:Name="PrevButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="15" Click="PrevButton_Click" ToolTip="Previous Track" Margin="0,0,6,0" />
-                    <Button x:Name="PlayPauseButton" Style="{StaticResource FlyoutButtonStyle}" Width="44" Height="44" Content="" FontSize="20" Click="PlayPauseButton_Click" ToolTip="Play / Pause" Background="{DynamicResource HoverBrush}" Margin="0,0,6,0" />
-                    <Button x:Name="NextButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="15" Click="NextButton_Click" ToolTip="Next Track" Margin="0,0,8,0" />
-                    <Button x:Name="RepeatButton" Style="{StaticResource FlyoutButtonStyle}" Width="32" Height="32" Content="" FontSize="14" Click="RepeatButton_Click" ToolTip="Repeat" />
+            <!-- 3: Transport Controls -->
+            <Grid Grid.Row="3" Margin="0,2,0,8">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Button x:Name="ShuffleButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="14" Click="ShuffleButton_Click" ToolTip="Shuffle" Margin="0,0,8,0" />
+                    <Button x:Name="PrevButton" Style="{StaticResource FlyoutButtonStyle}" Width="40" Height="40" Content="" FontSize="16" Click="PrevButton_Click" ToolTip="Previous Track" Margin="0,0,8,0" />
+                    <Button x:Name="PlayPauseButton" Style="{StaticResource PrimaryHeroButtonStyle}" Width="48" Height="48" Content="" FontSize="20" Click="PlayPauseButton_Click" ToolTip="Play / Pause" Margin="0,0,8,0" />
+                    <Button x:Name="NextButton" Style="{StaticResource FlyoutButtonStyle}" Width="40" Height="40" Content="" FontSize="16" Click="NextButton_Click" ToolTip="Next Track" Margin="0,0,8,0" />
+                    <Button x:Name="RepeatButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="14" Click="RepeatButton_Click" ToolTip="Repeat" />
                 </StackPanel>
             </Grid>
+
+            <!-- 4: Bottom Volume Bar -->
+            <Border Grid.Row="4" Margin="0,4,0,0" Padding="8,6" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="VolumeMuteButton" Grid.Column="0" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="13" Click="VolumeMuteButton_Click" ToolTip="Toggle Mute" />
+
+                    <TextBlock Grid.Column="1" Text="Use mouse scroll over widget for volume" FontSize="10.5" Foreground="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button x:Name="VolumeDownButton" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="12" Click="VolumeDownButton_Click" ToolTip="Volume Down" Margin="0,0,2,0" />
+                        <Button x:Name="VolumeUpButton" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="12" Click="VolumeUpButton_Click" ToolTip="Volume Up" />
+                    </StackPanel>
+                </Grid>
+            </Border>
         </Grid>
     </Border>
 </Window>
