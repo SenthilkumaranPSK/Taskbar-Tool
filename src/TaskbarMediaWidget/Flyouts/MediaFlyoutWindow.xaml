@@ -141,6 +141,38 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Quick Action Icon Button Style -->
+        <Style x:Key="QuickActionButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.7" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- Main Outer Container with Drop Shadow -->
@@ -158,6 +190,7 @@
                 <RowDefinition Height="Auto" /> <!-- 2: Timeline Scrubber -->
                 <RowDefinition Height="Auto" /> <!-- 3: Transport Controls -->
                 <RowDefinition Height="Auto" /> <!-- 4: Bottom Volume Bar -->
+                <RowDefinition Height="Auto" /> <!-- 5: Quick Launch & Actions Bar -->
             </Grid.RowDefinitions>
 
             <!-- 0: Header with Source App Pill & Close Button -->
@@ -252,6 +285,39 @@
                         <Button x:Name="VolumeDownButton" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="12" Click="VolumeDownButton_Click" ToolTip="Volume Down" Margin="0,0,2,0" />
                         <Button x:Name="VolumeUpButton" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="12" Click="VolumeUpButton_Click" ToolTip="Volume Up" />
                     </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 5: Quick Launch & System Actions Bar -->
+            <Border Grid.Row="5" Margin="0,10,0,0" Padding="10,8" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Header: Quick Tools + Hardware Stats Badge -->
+                    <Grid Grid.Row="0" Margin="2,0,2,8">
+                        <TextBlock Text="QUICK LAUNCH" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TertiaryTextBrush}" VerticalAlignment="Center" />
+                        <Border x:Name="HwBadge" HorizontalAlignment="Right" Background="{DynamicResource FlyoutBgBrush}" CornerRadius="8" Padding="6,2" Cursor="Hand" MouseDown="HwBadge_MouseDown" ToolTip="Live Hardware Usage • Click for Task Manager">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="HwStatsText" Text="CPU 0%  •  RAM 0%" FontSize="10" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Action Buttons Strip -->
+                    <UniformGrid Grid.Row="1" Rows="1" Columns="8" HorizontalAlignment="Stretch">
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE774;" ToolTip="Google Chrome" Click="LaunchChrome_Click" />
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xED25;" ToolTip="File Explorer" Click="LaunchExplorer_Click" />
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE756;" ToolTip="Windows Terminal" Click="LaunchTerminal_Click" />
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE8C8;" ToolTip="Snipping Tool" Click="LaunchSnippingTool_Click" />
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE70B;" ToolTip="Notepad" Click="LaunchNotepad_Click" />
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE8EF;" ToolTip="Calculator" Click="LaunchCalculator_Click" />
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE9D9;" ToolTip="Task Manager" Click="LaunchTaskManager_Click" />
+                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE72E;" ToolTip="Lock PC" Click="LockWorkstation_Click" />
+                    </UniformGrid>
                 </Grid>
             </Border>
         </Grid>

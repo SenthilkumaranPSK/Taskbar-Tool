@@ -78,27 +78,23 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
                 return;
             }
 
-            // Standby mode: clean, compact pill indicating the tool is active
+            // Standby mode: clean, compact docked launcher indicating the tool is active
             Visibility = Visibility.Visible;
             StopMarquee();
             StopEqualizer();
             _timelineTimer.Stop();
             ApplyAccent(null);
 
-            CoverArt.Source = null;
-            ArtFallback.Visibility = Visibility.Visible;
-            EqualizerBars.Visibility = Visibility.Collapsed;
             ProgressBarTrack.Visibility = Visibility.Collapsed;
-            TransportPanel.Visibility = Visibility.Collapsed;
+            MediaContentGrid.Visibility = Visibility.Collapsed;
+            StandbyLauncherPanel.Visibility = Visibility.Visible;
 
-            TitleText.Text = "No Media";
-            ArtistText.Text = "Ready • Click for controls";
-            ToolTip = "Taskbar Tool\nNo media playing\nClick to open controls";
+            ToolTip = "Taskbar Tool • Standby Launcher\nClick shortcuts to open apps | Click icon for Flyout";
 
-            if (_lastTitle != "No Media")
+            if (_lastTitle != null)
             {
-                _lastTitle = "No Media";
-                _lastArtist = "Ready • Click for controls";
+                _lastTitle = null;
+                _lastArtist = null;
                 ContentVersion++;
             }
 
@@ -106,6 +102,8 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         }
 
         Visibility = Visibility.Visible;
+        StandbyLauncherPanel.Visibility = Visibility.Collapsed;
+        MediaContentGrid.Visibility = Visibility.Visible;
         TransportPanel.Visibility = Visibility.Visible;
 
         var title = string.IsNullOrWhiteSpace(info.Title) ? "Not playing" : info.Title;
@@ -417,6 +415,29 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
     private void PlayPauseButton_Click(object sender, RoutedEventArgs e) => PlayPauseRequested?.Invoke(this, EventArgs.Empty);
 
     private void NextButton_Click(object sender, RoutedEventArgs e) => NextRequested?.Invoke(this, EventArgs.Empty);
+
+    public void UpdateHardwareStats(int cpuPercent, int ramPercent)
+    {
+        StandbyCpuText.Text = $"CPU {cpuPercent}%";
+        StandbyCpuBadge.ToolTip = $"CPU: {cpuPercent}% | RAM: {ramPercent}%\nClick to open Task Manager";
+    }
+
+    private void StandbyChromeBtn_Click(object sender, RoutedEventArgs e) => QuickLaunchHelper.LaunchChrome();
+
+    private void StandbyExplorerBtn_Click(object sender, RoutedEventArgs e) => QuickLaunchHelper.LaunchExplorer();
+
+    private void StandbyTerminalBtn_Click(object sender, RoutedEventArgs e) => QuickLaunchHelper.LaunchTerminal();
+
+    private void StandbySnipBtn_Click(object sender, RoutedEventArgs e) => QuickLaunchHelper.LaunchSnippingTool();
+
+    private void StandbyCpuBadge_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            QuickLaunchHelper.LaunchTaskManager();
+            e.Handled = true;
+        }
+    }
 
     private void OnMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
     {

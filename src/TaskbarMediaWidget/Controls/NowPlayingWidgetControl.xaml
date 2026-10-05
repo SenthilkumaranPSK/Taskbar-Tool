@@ -58,48 +58,76 @@
         <Border x:Name="PillBorder" CornerRadius="8" BorderThickness="1"
                 Background="{DynamicResource PillBaseBgBrush}"
                 BorderBrush="{DynamicResource PillBaseBorderBrush}">
-            <Grid x:Name="RootGrid" Background="Transparent" Margin="2,0,2,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <Grid Background="Transparent">
+                <!-- Active Media Playback Grid -->
+                <Grid x:Name="MediaContentGrid" Background="Transparent" Margin="2,0,2,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <!-- Cover Art or Music Icon -->
-                <Border Grid.Column="0" Width="24" Height="24" Margin="3,0,5,0" CornerRadius="5" ClipToBounds="True" Background="#20FFFFFF">
-                    <Grid>
-                        <TextBlock x:Name="ArtFallback" Text="" FontFamily="Segoe Fluent Icons" FontSize="13"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource AccentBrush}" />
-                        <Image x:Name="CoverArt" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                    </Grid>
-                </Border>
+                    <!-- Cover Art or Music Icon -->
+                    <Border Grid.Column="0" Width="24" Height="24" Margin="3,0,5,0" CornerRadius="5" ClipToBounds="True" Background="#20FFFFFF">
+                        <Grid>
+                            <TextBlock x:Name="ArtFallback" Text="" FontFamily="Segoe Fluent Icons" FontSize="13"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AccentBrush}" />
+                            <Image x:Name="CoverArt" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Grid>
+                    </Border>
 
-                <!-- Mini Animated Equalizer Bars -->
-                <StackPanel x:Name="EqualizerBars" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Collapsed" Height="14">
-                    <Border x:Name="EqBar1" Width="2" Height="6" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1.5,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="EqBar2" Width="2" Height="12" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1.5,0" VerticalAlignment="Bottom" />
-                    <Border x:Name="EqBar3" Width="2" Height="8" Background="{DynamicResource AccentBrush}" CornerRadius="1" VerticalAlignment="Bottom" />
-                </StackPanel>
-
-                <!-- Marquee Text Stack -->
-                <Canvas x:Name="TextClip" Grid.Column="2" ClipToBounds="True" Width="125">
-                    <StackPanel x:Name="TextStack" Orientation="Vertical" Canvas.Left="0" Canvas.Top="1">
-                        <TextBlock x:Name="TitleText" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="11" FontWeight="SemiBold"
-                                   AutomationProperties.LiveSetting="Polite" />
-                        <TextBlock x:Name="ArtistText" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="9.5" />
+                    <!-- Mini Animated Equalizer Bars -->
+                    <StackPanel x:Name="EqualizerBars" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Collapsed" Height="14">
+                        <Border x:Name="EqBar1" Width="2" Height="6" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1.5,0" VerticalAlignment="Bottom" />
+                        <Border x:Name="EqBar2" Width="2" Height="12" Background="{DynamicResource AccentBrush}" CornerRadius="1" Margin="0,0,1.5,0" VerticalAlignment="Bottom" />
+                        <Border x:Name="EqBar3" Width="2" Height="8" Background="{DynamicResource AccentBrush}" CornerRadius="1" VerticalAlignment="Bottom" />
                     </StackPanel>
-                </Canvas>
 
-                <!-- Transport Buttons -->
-                <StackPanel x:Name="TransportPanel" Grid.Column="3" Orientation="Horizontal" Margin="3,0,2,0">
-                    <Button x:Name="PreviousButton" Style="{StaticResource TransportButtonStyle}" Click="PreviousButton_Click"
-                            Content="&#xE892;" AutomationProperties.Name="Previous track" ToolTip="Previous Track" />
-                    <Button x:Name="PlayPauseButton" Style="{StaticResource TransportButtonStyle}" Click="PlayPauseButton_Click"
-                            Content="&#xE769;" AutomationProperties.Name="Pause" ToolTip="Play / Pause" />
-                    <Button x:Name="NextButton" Style="{StaticResource TransportButtonStyle}" Click="NextButton_Click"
-                            Content="&#xE893;" AutomationProperties.Name="Next track" ToolTip="Next Track" />
+                    <!-- Marquee Text Stack -->
+                    <Canvas x:Name="TextClip" Grid.Column="2" ClipToBounds="True" Width="125">
+                        <StackPanel x:Name="TextStack" Orientation="Vertical" Canvas.Left="0" Canvas.Top="1">
+                            <TextBlock x:Name="TitleText" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="11" FontWeight="SemiBold"
+                                       AutomationProperties.LiveSetting="Polite" />
+                            <TextBlock x:Name="ArtistText" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="9.5" />
+                        </StackPanel>
+                    </Canvas>
+
+                    <!-- Transport Buttons -->
+                    <StackPanel x:Name="TransportPanel" Grid.Column="3" Orientation="Horizontal" Margin="3,0,2,0">
+                        <Button x:Name="PreviousButton" Style="{StaticResource TransportButtonStyle}" Click="PreviousButton_Click"
+                                Content="&#xE892;" AutomationProperties.Name="Previous track" ToolTip="Previous Track" />
+                        <Button x:Name="PlayPauseButton" Style="{StaticResource TransportButtonStyle}" Click="PlayPauseButton_Click"
+                                Content="&#xE769;" AutomationProperties.Name="Pause" ToolTip="Play / Pause" />
+                        <Button x:Name="NextButton" Style="{StaticResource TransportButtonStyle}" Click="NextButton_Click"
+                                Content="&#xE893;" AutomationProperties.Name="Next track" ToolTip="Next Track" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Standby Quick Dock Panel (Visible when no media is playing) -->
+                <StackPanel x:Name="StandbyLauncherPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="3,0,3,0" Visibility="Collapsed">
+                    <!-- App Icon / Controls Launcher Badge -->
+                    <Border x:Name="StandbyAppBadge" Width="24" Height="24" Margin="2,0,4,0" CornerRadius="5" Background="#1FFFFFFF" ToolTip="Taskbar Tool • Click to open Flyout">
+                        <TextBlock Text="&#xE718;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <!-- Shortcuts Strip -->
+                    <Button x:Name="StandbyChromeBtn" Style="{StaticResource TransportButtonStyle}" Content="&#xE774;" ToolTip="Launch Google Chrome" Click="StandbyChromeBtn_Click" Margin="0,0,2,0" />
+                    <Button x:Name="StandbyExplorerBtn" Style="{StaticResource TransportButtonStyle}" Content="&#xED25;" ToolTip="Open File Explorer" Click="StandbyExplorerBtn_Click" Margin="0,0,2,0" />
+                    <Button x:Name="StandbyTerminalBtn" Style="{StaticResource TransportButtonStyle}" Content="&#xE756;" ToolTip="Launch Terminal" Click="StandbyTerminalBtn_Click" Margin="0,0,2,0" />
+                    <Button x:Name="StandbySnipBtn" Style="{StaticResource TransportButtonStyle}" Content="&#xE8C8;" ToolTip="Snipping Tool (Screen Capture)" Click="StandbySnipBtn_Click" Margin="0,0,3,0" />
+
+                    <!-- Subtle Vertical Divider -->
+                    <Border Width="1" Height="14" Background="#28FFFFFF" Margin="2,0,4,0" VerticalAlignment="Center" />
+
+                    <!-- Live Hardware CPU & RAM Badge -->
+                    <Border x:Name="StandbyCpuBadge" Height="22" CornerRadius="4" Background="#16FFFFFF" Padding="5,0" Cursor="Hand" MouseDown="StandbyCpuBadge_MouseDown" ToolTip="Click for Task Manager" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="StandbyCpuText" Text="CPU 0%" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Grid>
         </Border>

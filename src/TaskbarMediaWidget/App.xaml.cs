@@ -24,6 +24,7 @@ public partial class App : System.Windows.Application
     private TaskbarWidgetWindow? _widgetWindow;
     private MediaFlyoutWindow? _flyoutWindow;
     private ShellWatchdogWindow? _shellWatchdog;
+    private HardwareMonitorService? _hardwareMonitorService;
     private bool _explorerRestarting;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -47,6 +48,9 @@ public partial class App : System.Windows.Application
         }
 
         AppLog.Info("Starting Taskbar Tool.");
+
+        _hardwareMonitorService = new HardwareMonitorService();
+        _hardwareMonitorService.UsageUpdated += OnHardwareUsageUpdated;
 
         _mediaSessionService = new MediaSessionService();
         _trayIconService = new TrayIconService();
@@ -72,6 +76,7 @@ public partial class App : System.Windows.Application
         // reads a head start — CreateWidgetWindow also starts the widget hidden regardless (see
         // TaskbarWidgetWindow.OnSourceInitialized), so there's no visible empty-box moment either way.
         _mediaSessionService.Start();
+        _hardwareMonitorService.Start();
         CreateWidgetWindow();
 
         ScheduleStartupTrim();
@@ -113,6 +118,12 @@ public partial class App : System.Windows.Application
         var initialNowPlaying = _mediaSessionService?.CurrentNowPlaying;
         _widgetWindow.UpdateNowPlaying(initialNowPlaying);
         _flyoutWindow?.UpdateNowPlaying(initialNowPlaying);
+
+        if (_hardwareMonitorService is not null)
+        {
+            _widgetWindow.UpdateHardwareStats(_hardwareMonitorService.CurrentCpuPercent, _hardwareMonitorService.CurrentRamPercent);
+            _flyoutWindow?.UpdateHardwareStats(_hardwareMonitorService.CurrentCpuPercent, _hardwareMonitorService.CurrentRamPercent);
+        }
     }
 
     private void ShowFlyoutFromTray()
@@ -199,9 +210,22 @@ public partial class App : System.Windows.Application
             _flyoutWindow?.UpdateNowPlaying(info);
         });
 
+    private void OnHardwareUsageUpdated(int cpu, int ram) =>
+        Dispatcher.InvokeAsync(() =>
+        {
+            _widgetWindow?.UpdateHardwareStats(cpu, ram);
+            _flyoutWindow?.UpdateHardwareStats(cpu, ram);
+        });
+
     private void ExitApplication()
     {
         AppLog.Info("Exit requested from tray icon.");
+
+        if (_hardwareMonitorService is not null)
+        {
+            _hardwareMonitorService.UsageUpdated -= OnHardwareUsageUpdated;
+            _hardwareMonitorService.Dispose();
+        }
 
         if (_mediaSessionService is not null)
         {

@@ -169,7 +169,7 @@ public partial class MediaFlyoutWindow : Window
     {
         Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
         var width = ActualWidth > 0 ? ActualWidth : (DesiredSize.Width > 0 ? DesiredSize.Width : 360);
-        var height = ActualHeight > 0 ? ActualHeight : (DesiredSize.Height > 0 ? DesiredSize.Height : 280);
+        var height = ActualHeight > 0 ? ActualHeight : (DesiredSize.Height > 0 ? DesiredSize.Height : 360);
 
         var workArea = SystemParameters.WorkArea;
 
@@ -188,6 +188,11 @@ public partial class MediaFlyoutWindow : Window
 
         Left = Math.Max(workArea.Left + 8, Math.Min(targetLeft, workArea.Right - width - 8));
         Top = Math.Max(workArea.Top + 8, targetTop);
+    }
+
+    public void UpdateHardwareStats(int cpuPercent, int ramPercent)
+    {
+        HwStatsText.Text = $"CPU {cpuPercent}%  •  RAM {ramPercent}%";
     }
 
     public void ShowFlyout(bool fromTray = false)
@@ -275,6 +280,63 @@ public partial class MediaFlyoutWindow : Window
     private void VolumeUpButton_Click(object sender, RoutedEventArgs e) => VolumeHelper.VolumeUp();
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Hide();
+
+    private void LaunchChrome_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LaunchChrome();
+        Hide();
+    }
+
+    private void LaunchExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LaunchExplorer();
+        Hide();
+    }
+
+    private void LaunchTerminal_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LaunchTerminal();
+        Hide();
+    }
+
+    private void LaunchSnippingTool_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LaunchSnippingTool();
+        Hide();
+    }
+
+    private void LaunchNotepad_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LaunchNotepad();
+        Hide();
+    }
+
+    private void LaunchCalculator_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LaunchCalculator();
+        Hide();
+    }
+
+    private void LaunchTaskManager_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LaunchTaskManager();
+        Hide();
+    }
+
+    private void LockWorkstation_Click(object sender, RoutedEventArgs e)
+    {
+        QuickLaunchHelper.LockWorkstation();
+        Hide();
+    }
+
+    private void HwBadge_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            QuickLaunchHelper.LaunchTaskManager();
+            Hide();
+        }
+    }
 
     protected override void OnClosed(EventArgs e)
     {

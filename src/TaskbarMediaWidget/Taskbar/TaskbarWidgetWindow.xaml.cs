@@ -118,6 +118,11 @@ public partial class TaskbarWidgetWindow : Window
         _pollTimer.Interval = TimeSpan.FromMilliseconds(ActivePollIntervalMs);
     }
 
+    public void UpdateHardwareStats(int cpuPercent, int ramPercent)
+    {
+        Widget.UpdateHardwareStats(cpuPercent, ramPercent);
+    }
+
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         _hwnd = new WindowInteropHelper(this).Handle;
