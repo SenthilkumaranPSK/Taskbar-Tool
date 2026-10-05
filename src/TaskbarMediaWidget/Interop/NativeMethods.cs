@@ -30,6 +30,15 @@ internal static class NativeMethods
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int SPI_SETWORKAREA = 0x002F;
 
+    public const byte VK_VOLUME_MUTE = 0xAD;
+    public const byte VK_VOLUME_DOWN = 0xAE;
+    public const byte VK_VOLUME_UP = 0xAF;
+    public const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
+
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
 

@@ -39,6 +39,7 @@ public partial class TaskbarWidgetWindow : Window
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
+    public event Action<int, int>? FlyoutToggleRequested;
 
     public TaskbarWidgetWindow()
     {
@@ -50,6 +51,11 @@ public partial class TaskbarWidgetWindow : Window
         Widget.PreviousRequested += (_, _) => PreviousRequested?.Invoke(this, EventArgs.Empty);
         Widget.PlayPauseRequested += (_, _) => PlayPauseRequested?.Invoke(this, EventArgs.Empty);
         Widget.NextRequested += (_, _) => NextRequested?.Invoke(this, EventArgs.Empty);
+        Widget.FlyoutToggleRequested += (_, _) =>
+        {
+            var (x, y) = GetWidgetScreenPosition();
+            FlyoutToggleRequested?.Invoke(x, y);
+        };
 
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -72,6 +78,19 @@ public partial class TaskbarWidgetWindow : Window
         SourceInitialized += OnSourceInitialized;
     }
 
+    public (int X, int Y) GetWidgetScreenPosition()
+    {
+        if (_taskbarHandle != IntPtr.Zero)
+        {
+            var taskbarRect = TaskbarLocator.GetTaskbarRect(_taskbarHandle);
+            var dpiScale = TaskbarLocator.GetDpiScale(_taskbarHandle);
+            var startX = (int)Math.Round(LeftEdgeMarginLogicalPx * dpiScale);
+            return (taskbarRect.Left + startX, taskbarRect.Top);
+        }
+
+        return (20, (int)SystemParameters.PrimaryScreenHeight - 60);
+    }
+
     public void UpdateNowPlaying(NowPlayingInfo? info)
     {
         Widget.SetNowPlaying(info);
@@ -83,12 +102,18 @@ public partial class TaskbarWidgetWindow : Window
 
         if (info is null)
         {
-            SetWindowVisible(false);
-            _pollTimer.Interval = TimeSpan.FromMilliseconds(HiddenPollIntervalMs);
+            if (AppSettings.HideWhenIdle)
+            {
+                SetWindowVisible(false);
+                _pollTimer.Interval = TimeSpan.FromMilliseconds(HiddenPollIntervalMs);
+                MemoryTrimmer.TrimIfIdle("nothing playing");
+                return;
+            }
 
-            // Genuine "nothing is playing" idle — a good moment to hand back the working set the
-            // last render peak left behind. Throttled internally, so calling it on every stop is fine.
-            MemoryTrimmer.TrimIfIdle("nothing playing");
+            // Standby mode
+            TryReposition();
+            SetWindowVisible(true);
+            _pollTimer.Interval = TimeSpan.FromMilliseconds(ActivePollIntervalMs);
             return;
         }
 

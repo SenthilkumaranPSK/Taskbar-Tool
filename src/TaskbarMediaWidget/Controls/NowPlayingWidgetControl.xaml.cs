@@ -1,8 +1,11 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
+using TaskbarMediaWidget.Core;
 using TaskbarMediaWidget.Media;
 
 namespace TaskbarMediaWidget.Controls;
@@ -13,18 +16,40 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
     private const string PlayGlyph = "";
     private const string PauseGlyph = "";
 
+    private readonly DispatcherTimer _timelineTimer;
+    private Storyboard? _equalizerStoryboard;
+
+    private NowPlayingInfo? _currentInfo;
     private string? _lastTitle;
     private string? _lastArtist;
     private System.Windows.Media.Color? _accentColor;
     private bool _isLightTheme;
+    private bool _isEqualizerAnimating;
 
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
+    public event EventHandler? FlyoutToggleRequested;
 
     public NowPlayingWidgetControl()
     {
         InitializeComponent();
+
+        _timelineTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(500),
+        };
+        _timelineTimer.Tick += OnTimelineTimerTick;
+
+        ProgressBarTrack.SizeChanged += (_, _) =>
+        {
+            if (_currentInfo is not null && _currentInfo.Duration > TimeSpan.Zero)
+            {
+                UpdateProgressBar(_currentInfo.ProgressFraction);
+            }
+        };
+
+        CreateEqualizerStoryboard();
     }
 
     /// <summary>
@@ -37,24 +62,68 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
     /// <summary>Updates the widget's content. Pass null to represent "nothing playing."</summary>
     public void SetNowPlaying(NowPlayingInfo? info)
     {
+        _currentInfo = info;
+
         if (info is null)
         {
-            Visibility = Visibility.Collapsed;
+            if (AppSettings.HideWhenIdle)
+            {
+                Visibility = Visibility.Collapsed;
+                StopMarquee();
+                StopEqualizer();
+                _timelineTimer.Stop();
+                ApplyAccent(null);
+                _lastTitle = null;
+                _lastArtist = null;
+                return;
+            }
+
+            // Standby mode: clean, compact pill indicating the tool is active
+            Visibility = Visibility.Visible;
             StopMarquee();
+            StopEqualizer();
+            _timelineTimer.Stop();
             ApplyAccent(null);
-            _lastTitle = null;
-            _lastArtist = null;
+
+            CoverArt.Source = null;
+            ArtFallback.Visibility = Visibility.Visible;
+            EqualizerBars.Visibility = Visibility.Collapsed;
+            ProgressBarTrack.Visibility = Visibility.Collapsed;
+            TransportPanel.Visibility = Visibility.Collapsed;
+
+            TitleText.Text = "Taskbar Tool";
+            ArtistText.Text = "Ready • Click to open";
+            ToolTip = "Taskbar Tool\nNo media playing\nClick to open controls";
+
+            if (_lastTitle != "Taskbar Tool")
+            {
+                _lastTitle = "Taskbar Tool";
+                _lastArtist = "Ready • Click to open";
+                ContentVersion++;
+            }
+
             return;
         }
 
         Visibility = Visibility.Visible;
+        TransportPanel.Visibility = Visibility.Visible;
 
         var title = string.IsNullOrWhiteSpace(info.Title) ? "Not playing" : info.Title;
         var isNewTrack = title != _lastTitle || info.Artist != _lastArtist;
 
         TitleText.Text = title;
         ArtistText.Text = info.Artist;
-        CoverArt.Source = info.Thumbnail;
+
+        if (info.Thumbnail is not null)
+        {
+            CoverArt.Source = info.Thumbnail;
+            ArtFallback.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            CoverArt.Source = null;
+            ArtFallback.Visibility = Visibility.Visible;
+        }
 
         PreviousButton.IsEnabled = info.IsPreviousEnabled;
         NextButton.IsEnabled = info.IsNextEnabled;
@@ -64,6 +133,44 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 
         ApplyAccent(info.AccentColor);
 
+        // Tooltip feedback
+        var timeStr = info.Duration > TimeSpan.Zero
+            ? $"{NowPlayingInfo.FormatTime(info.CurrentPosition)} / {NowPlayingInfo.FormatTime(info.Duration)}"
+            : string.Empty;
+        ToolTip = $"[{info.SourceApp}] {title}\n{info.Artist}{(string.IsNullOrEmpty(timeStr) ? "" : "\n" + timeStr)}\n• Scroll: Volume\n• Click: Open Flyout";
+
+        // Equalizer animation
+        EqualizerBars.Visibility = Visibility.Visible;
+        if (info.IsPlaying)
+        {
+            StartEqualizer();
+        }
+        else
+        {
+            PauseEqualizer();
+        }
+
+        // Track Progress Bar
+        if (info.Duration > TimeSpan.Zero)
+        {
+            ProgressBarTrack.Visibility = Visibility.Visible;
+            UpdateProgressBar(info.ProgressFraction);
+
+            if (info.IsPlaying && !_timelineTimer.IsEnabled)
+            {
+                _timelineTimer.Start();
+            }
+            else if (!info.IsPlaying)
+            {
+                _timelineTimer.Stop();
+            }
+        }
+        else
+        {
+            ProgressBarTrack.Visibility = Visibility.Collapsed;
+            _timelineTimer.Stop();
+        }
+
         if (isNewTrack)
         {
             _lastTitle = title;
@@ -71,11 +178,6 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
             ContentVersion++;
         }
 
-        // A storyboard with RepeatBehavior.Forever keeps WPF's composition thread busy at display
-        // refresh rate for as long as it runs — pointless (and not free on battery) while paused
-        // or hidden, so only keep it running while actually playing. Only reset scroll position
-        // to 0 on an actual track change, otherwise a play/pause toggle (which also calls
-        // SetNowPlaying) would yank mid-scroll text back to the start.
         if (!info.IsPlaying)
         {
             StopMarquee();
@@ -84,6 +186,25 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         {
             RestartMarquee();
         }
+    }
+
+    private void OnTimelineTimerTick(object? sender, EventArgs e)
+    {
+        if (_currentInfo is not null && _currentInfo.IsPlaying && _currentInfo.Duration > TimeSpan.Zero)
+        {
+            UpdateProgressBar(_currentInfo.ProgressFraction);
+        }
+    }
+
+    private void UpdateProgressBar(double fraction)
+    {
+        var trackWidth = ProgressBarTrack.ActualWidth;
+        if (trackWidth <= 0)
+        {
+            return;
+        }
+
+        ProgressBarFill.Width = Math.Clamp(trackWidth * fraction, 0, trackWidth);
     }
 
     /// <summary>Natural width of the widget's content, for the host window to size itself to.</summary>
@@ -108,16 +229,17 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
             ? System.Windows.Media.Color.FromArgb(0x22, 0x00, 0x00, 0x00)
             : System.Windows.Media.Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
 
-        // The tint's alpha differs per theme, so the current accent has to be rebuilt, not kept.
+        Resources["PillBaseBgBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0x18, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
+
+        Resources["PillBaseBorderBrush"] = new SolidColorBrush(isLightTheme
+            ? System.Windows.Media.Color.FromArgb(0x28, 0x00, 0x00, 0x00)
+            : System.Windows.Media.Color.FromArgb(0x28, 0xFF, 0xFF, 0xFF));
+
         ApplyAccent(_accentColor, force: true);
     }
 
-    /// <summary>
-    /// Tints the pill from the album art's dominant color. Called on every SetNowPlaying (which
-    /// Chromium-based browsers trigger many times per track), so it early-outs unless the color
-    /// actually changed — otherwise every stray property-changed event would allocate and freeze
-    /// a fresh brush pair for an identical result.
-    /// </summary>
     private void ApplyAccent(System.Windows.Media.Color? accent, bool force = false)
     {
         if (!force && Nullable.Equals(_accentColor, accent))
@@ -129,17 +251,17 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 
         if (accent is not { } color)
         {
-            PillBorder.Background = System.Windows.Media.Brushes.Transparent;
-            PillBorder.BorderBrush = System.Windows.Media.Brushes.Transparent;
+            Resources["AccentBrush"] = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x60, 0xCD, 0xFF));
+            PillBorder.Background = (System.Windows.Media.Brush)Resources["PillBaseBgBrush"];
+            PillBorder.BorderBrush = (System.Windows.Media.Brush)Resources["PillBaseBorderBrush"];
             return;
         }
 
-        // Kept deliberately faint: this sits on top of the real taskbar, and anything stronger
-        // reads as a foreign panel bolted onto the shell rather than part of it. A light taskbar
-        // needs slightly less alpha than a dark one for the same perceived weight.
+        Resources["AccentBrush"] = new SolidColorBrush(color);
+
         var (fillStart, fillEnd, edge) = _isLightTheme
-            ? ((byte)0x3C, (byte)0x0E, (byte)0x59)
-            : ((byte)0x4A, (byte)0x12, (byte)0x66);
+            ? ((byte)0x45, (byte)0x15, (byte)0x66)
+            : ((byte)0x55, (byte)0x1C, (byte)0x77);
 
         var fill = new LinearGradientBrush
         {
@@ -154,6 +276,57 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         var stroke = new SolidColorBrush(System.Windows.Media.Color.FromArgb(edge, color.R, color.G, color.B));
         stroke.Freeze();
         PillBorder.BorderBrush = stroke;
+    }
+
+    private void CreateEqualizerStoryboard()
+    {
+        _equalizerStoryboard = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
+
+        var anim1 = new DoubleAnimation(4, 11, TimeSpan.FromMilliseconds(320)) { AutoReverse = true };
+        Storyboard.SetTarget(anim1, EqBar1);
+        Storyboard.SetTargetProperty(anim1, new PropertyPath(FrameworkElement.HeightProperty));
+        _equalizerStoryboard.Children.Add(anim1);
+
+        var anim2 = new DoubleAnimation(5, 13, TimeSpan.FromMilliseconds(260)) { AutoReverse = true };
+        Storyboard.SetTarget(anim2, EqBar2);
+        Storyboard.SetTargetProperty(anim2, new PropertyPath(FrameworkElement.HeightProperty));
+        _equalizerStoryboard.Children.Add(anim2);
+
+        var anim3 = new DoubleAnimation(3, 9, TimeSpan.FromMilliseconds(380)) { AutoReverse = true };
+        Storyboard.SetTarget(anim3, EqBar3);
+        Storyboard.SetTargetProperty(anim3, new PropertyPath(FrameworkElement.HeightProperty));
+        _equalizerStoryboard.Children.Add(anim3);
+    }
+
+    private void StartEqualizer()
+    {
+        if (!_isEqualizerAnimating)
+        {
+            _equalizerStoryboard?.Begin(this, isControllable: true);
+            _isEqualizerAnimating = true;
+        }
+    }
+
+    private void PauseEqualizer()
+    {
+        if (_isEqualizerAnimating)
+        {
+            _equalizerStoryboard?.Stop(this);
+            _isEqualizerAnimating = false;
+        }
+
+        EqBar1.Height = 3;
+        EqBar2.Height = 4;
+        EqBar3.Height = 2;
+    }
+
+    private void StopEqualizer()
+    {
+        if (_isEqualizerAnimating)
+        {
+            _equalizerStoryboard?.Stop(this);
+            _isEqualizerAnimating = false;
+        }
     }
 
     private void RestartMarquee()
@@ -182,6 +355,57 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
             };
             TextStack.BeginAnimation(Canvas.LeftProperty, animation);
         }, System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (e.Delta > 0)
+        {
+            VolumeHelper.VolumeUp();
+        }
+        else if (e.Delta < 0)
+        {
+            VolumeHelper.VolumeDown();
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Middle)
+        {
+            VolumeHelper.ToggleMute();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            // Do not trigger flyout if clicking on one of the transport buttons
+            if (e.OriginalSource is DependencyObject dep && FindParentButton(dep) is not null)
+            {
+                return;
+            }
+
+            FlyoutToggleRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+    }
+
+    private static System.Windows.Controls.Button? FindParentButton(DependencyObject? current)
+    {
+        while (current is not null)
+        {
+            if (current is System.Windows.Controls.Button btn)
+            {
+                return btn;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private void PreviousButton_Click(object sender, RoutedEventArgs e) => PreviousRequested?.Invoke(this, EventArgs.Empty);

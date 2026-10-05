@@ -12,14 +12,17 @@ A compact "now playing" media widget that lives **inside the real Windows taskba
 
 ## What it looks like
 
-The widget docks flush against the taskbar's left edge and shows cover art, title, artist, and transport controls (previous / play-pause / next) that control the source app directly:
+The widget docks flush against the taskbar's left edge and shows cover art, an animated mini equalizer, title, artist, live 2px track progress line, and transport controls:
 
 ```
-[ 🎵  Track Title            ⏮ ▶ ⏭ ]   [Start] [pinned apps...]           [tray icons] [clock]
-  ↑ anchored to the taskbar's left edge, independent of Start's position
+[ 🎵 ılı Track Title          ⏮ ▶ ⏭ ]   [Start] [pinned apps...]           [tray icons] [clock]
+  ═══════════════════ (live progress bar)
 ```
 
-When nothing is playing, the widget disappears entirely — no empty box left behind. When something is, the pill picks up a subtle tint sampled from the album art's dominant color (and stays untinted for greyscale or black-and-white covers, rather than smearing a grey wash across the taskbar).
+- **Interactive Flyout**: Left-clicking the widget opens a sleek Windows 11 Fluent 2 flyout above the taskbar with a scrubbable timeline slider, large album art, source app badge, volume control, and shuffle/repeat buttons.
+- **Mouse Volume Control**: Hovering over the widget and scrolling the mouse wheel smoothly turns system volume up or down (triggering Windows 11's native volume OSD); middle-clicking toggles mute.
+- **Dynamic Accent**: The pill picks up a subtle tint sampled from the album art's dominant color.
+- **Standby Mode**: When nothing is playing, the widget displays a clean standby pill so you always know it's ready (or can be configured to hide completely via the tray menu).
 
 ## Why it's built the way it is
 
@@ -68,12 +71,16 @@ The app has no visible main window — it's tray-only. Right-click the tray icon
 |---|---|
 | `Taskbar/TaskbarWidgetWindow.xaml.cs` | Reparents itself into `Shell_TrayWnd`; a self-healing poll (1.3s while visible, 5s while hidden) plus DPI/display-change hooks keeps it positioned and re-attaches after Explorer restarts |
 | `Taskbar/TaskbarLocator.cs` | Resolves the taskbar's handle, DPI, and precise client rect — caching the rect and doing its UI Automation work off the UI thread |
+| `Controls/NowPlayingWidgetControl.xaml.cs` | Interactive taskbar pill with live 2px progress bar, animated mini equalizer, and mouse-wheel volume control |
+| `Flyouts/MediaFlyoutWindow.xaml.cs` | Fluent 2 media card with timeline seek scrubber, high-res cover art, and transport/volume controls |
+| `Core/VolumeHelper.cs` | Smooth Windows volume adjustments & mute toggling triggering native Windows 11 OSD |
+| `Core/AppSettings.cs` | Manages per-user preferences (e.g., toggleable "Hide widget when idle") |
 | `Core/MemoryTrimmer.cs` | Returns the idle working set to the OS, throttled and only while the widget is hidden |
-| `Media/MediaSessionService.cs` | Wraps [`WindowsMediaController`](https://github.com/DubyaDude/WindowsMediaController) (an SMTC wrapper) and picks one active session: focused → else playing → else whatever's available |
+| `Media/MediaSessionService.cs` | Wraps [`WindowsMediaController`](https://github.com/DubyaDude/WindowsMediaController) (an SMTC wrapper) and manages playback, timeline, and session selection |
 | `Media/ThumbnailConverter.cs` | Decodes an SMTC thumbnail stream into a WPF `BitmapImage` |
 | `Media/AccentColorExtractor.cs` | Reduces that thumbnail to one vibrant color (weighted hue histogram) for the pill tint |
 | `Core/StartupRegistration.cs` | Reads/writes the `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry behind the tray's "Run at startup" toggle |
-| `Tray/TrayIconService.cs` | The only visible chrome — a tray icon with "Run at startup" and "Exit" |
+| `Tray/TrayIconService.cs` | Notification area icon with "Open Media Flyout", "Hide widget when idle", "Run at startup", and "Exit" |
 
 Full architectural notes, gotchas, and the reasoning behind non-obvious decisions live in [`CLAUDE.md`](CLAUDE.md).
 

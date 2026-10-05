@@ -44,6 +44,7 @@ internal sealed class MediaSessionService : IDisposable
         _mediaManager.OnAnySessionOpened += OnAnySessionOpened;
         _mediaManager.OnAnyMediaPropertyChanged += OnAnyMediaPropertyChanged;
         _mediaManager.OnAnyPlaybackStateChanged += OnAnyPlaybackStateChanged;
+        _mediaManager.OnAnyTimelinePropertyChanged += OnAnyTimelinePropertyChanged;
         _mediaManager.OnAnySessionClosed += OnAnySessionClosed;
         _mediaManager.OnFocusedSessionChanged += OnFocusedSessionChanged;
         _mediaManager.Start();
@@ -118,12 +119,47 @@ internal sealed class MediaSessionService : IDisposable
         }
     }
 
+    public async Task SeekAsync(TimeSpan position)
+    {
+        if (GetActiveSession() is { } session)
+        {
+            await session.ControlSession.TryChangePlaybackPositionAsync(position.Ticks);
+        }
+    }
+
+    public async Task ToggleShuffleAsync()
+    {
+        if (GetActiveSession() is { } session)
+        {
+            var isShuffle = session.ControlSession.GetPlaybackInfo()?.IsShuffleActive ?? false;
+            await session.ControlSession.TryChangeShuffleActiveAsync(!isShuffle);
+        }
+    }
+
+    public async Task ToggleRepeatAsync()
+    {
+        if (GetActiveSession() is { } session)
+        {
+            var current = session.ControlSession.GetPlaybackInfo()?.AutoRepeatMode ?? Windows.Media.MediaPlaybackAutoRepeatMode.None;
+            var next = current switch
+            {
+                Windows.Media.MediaPlaybackAutoRepeatMode.None => Windows.Media.MediaPlaybackAutoRepeatMode.List,
+                Windows.Media.MediaPlaybackAutoRepeatMode.List => Windows.Media.MediaPlaybackAutoRepeatMode.Track,
+                _ => Windows.Media.MediaPlaybackAutoRepeatMode.None,
+            };
+            await session.ControlSession.TryChangeAutoRepeatModeAsync(next);
+        }
+    }
+
     private void OnAnySessionOpened(MediaSession mediaSession) => _ = RefreshAsync();
 
     private void OnAnyMediaPropertyChanged(MediaSession mediaSession, Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties mediaProperties) =>
         _ = RefreshAsync();
 
     private void OnAnyPlaybackStateChanged(MediaSession mediaSession, Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackInfo? playbackInfo) =>
+        _ = RefreshAsync();
+
+    private void OnAnyTimelinePropertyChanged(MediaSession mediaSession, Windows.Media.Control.GlobalSystemMediaTransportControlsSessionTimelineProperties? timelineProperties) =>
         _ = RefreshAsync();
 
     private void OnAnySessionClosed(MediaSession mediaSession) => _ = RefreshAsync();
@@ -236,17 +272,55 @@ internal sealed class MediaSessionService : IDisposable
         }
 
         var playbackInfo = controlSession.GetPlaybackInfo();
+        var controls = playbackInfo?.Controls;
+        var timelineInfo = controlSession.GetTimelineProperties();
         var (thumbnail, accent) = await GetArtworkAsync(mediaProperties);
+        var sourceApp = ResolveSourceApp(session);
 
         return new NowPlayingInfo(
             Title: mediaProperties.Title ?? string.Empty,
             Artist: mediaProperties.Artist ?? string.Empty,
+            AlbumTitle: mediaProperties.AlbumTitle ?? string.Empty,
+            SourceApp: sourceApp,
             Thumbnail: thumbnail,
             PlaybackStatus: playbackInfo?.PlaybackStatus ?? Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Closed,
-            IsPreviousEnabled: playbackInfo?.Controls?.IsPreviousEnabled ?? false,
-            IsPlayPauseEnabled: (playbackInfo?.Controls?.IsPlayEnabled ?? false) || (playbackInfo?.Controls?.IsPauseEnabled ?? false),
-            IsNextEnabled: playbackInfo?.Controls?.IsNextEnabled ?? false,
+            IsPreviousEnabled: controls?.IsPreviousEnabled ?? false,
+            IsPlayPauseEnabled: (controls?.IsPlayEnabled ?? false) || (controls?.IsPauseEnabled ?? false),
+            IsNextEnabled: controls?.IsNextEnabled ?? false,
+            Position: timelineInfo?.Position ?? TimeSpan.Zero,
+            Duration: timelineInfo?.EndTime ?? TimeSpan.Zero,
+            LastUpdatedTime: timelineInfo?.LastUpdatedTime ?? DateTimeOffset.UtcNow,
+            CanSeek: controls?.IsPlaybackPositionEnabled ?? false,
+            IsShuffleActive: playbackInfo?.IsShuffleActive,
+            AutoRepeatMode: playbackInfo?.AutoRepeatMode,
             AccentColor: accent);
+    }
+
+    private static string ResolveSourceApp(MediaSession session)
+    {
+        var raw = session.ControlSession?.SourceAppUserModelId;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            raw = session.Id ?? string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return "Media Player";
+        }
+
+        if (raw.Contains("spotify", StringComparison.OrdinalIgnoreCase)) return "Spotify";
+        if (raw.Contains("chrome", StringComparison.OrdinalIgnoreCase)) return "Google Chrome";
+        if (raw.Contains("msedge", StringComparison.OrdinalIgnoreCase) || raw.Contains("edge", StringComparison.OrdinalIgnoreCase)) return "Microsoft Edge";
+        if (raw.Contains("firefox", StringComparison.OrdinalIgnoreCase)) return "Mozilla Firefox";
+        if (raw.Contains("vlc", StringComparison.OrdinalIgnoreCase)) return "VLC Media Player";
+        if (raw.Contains("music", StringComparison.OrdinalIgnoreCase)) return "Music";
+        if (raw.Contains("itunes", StringComparison.OrdinalIgnoreCase)) return "Apple Music";
+        if (raw.Contains("tidal", StringComparison.OrdinalIgnoreCase)) return "TIDAL";
+        if (raw.Contains("foobar", StringComparison.OrdinalIgnoreCase)) return "foobar2000";
+
+        var name = System.IO.Path.GetFileNameWithoutExtension(raw);
+        return string.IsNullOrWhiteSpace(name) ? raw : name;
     }
 
     // Chromium-based browsers fire media-property-changed aggressively — often several times for
@@ -293,6 +367,7 @@ internal sealed class MediaSessionService : IDisposable
         _mediaManager.OnAnySessionOpened -= OnAnySessionOpened;
         _mediaManager.OnAnyMediaPropertyChanged -= OnAnyMediaPropertyChanged;
         _mediaManager.OnAnyPlaybackStateChanged -= OnAnyPlaybackStateChanged;
+        _mediaManager.OnAnyTimelinePropertyChanged -= OnAnyTimelinePropertyChanged;
         _mediaManager.OnAnySessionClosed -= OnAnySessionClosed;
         _mediaManager.OnFocusedSessionChanged -= OnFocusedSessionChanged;
         _mediaManager.Dispose();

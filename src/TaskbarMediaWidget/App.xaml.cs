@@ -1,5 +1,6 @@
 using System.Windows;
 using TaskbarMediaWidget.Core;
+using TaskbarMediaWidget.Flyouts;
 using TaskbarMediaWidget.Interop;
 using TaskbarMediaWidget.Media;
 using TaskbarMediaWidget.Taskbar;
@@ -21,6 +22,7 @@ public partial class App : System.Windows.Application
     private MediaSessionService? _mediaSessionService;
     private TrayIconService? _trayIconService;
     private TaskbarWidgetWindow? _widgetWindow;
+    private MediaFlyoutWindow? _flyoutWindow;
     private ShellWatchdogWindow? _shellWatchdog;
     private bool _explorerRestarting;
 
@@ -49,6 +51,17 @@ public partial class App : System.Windows.Application
         _mediaSessionService = new MediaSessionService();
         _trayIconService = new TrayIconService();
         _trayIconService.ExitRequested += (_, _) => ExitApplication();
+        _trayIconService.FlyoutRequested += (_, _) => ShowFlyoutFromTray();
+
+        _flyoutWindow = new MediaFlyoutWindow();
+        _flyoutWindow.PreviousRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PreviousAsync());
+        _flyoutWindow.PlayPauseRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PlayPauseAsync());
+        _flyoutWindow.NextRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.NextAsync());
+        _flyoutWindow.ShuffleRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.ToggleShuffleAsync());
+        _flyoutWindow.RepeatRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.ToggleRepeatAsync());
+        _flyoutWindow.SeekRequested += target => _ = RunCommandAsync(_mediaSessionService!.SeekAsync(target));
+
+        AppSettings.SettingsChanged += (_, _) => Dispatcher.Invoke(() => _widgetWindow?.UpdateNowPlaying(_mediaSessionService?.CurrentNowPlaying));
 
         // Never reparented, so — unlike TaskbarWidgetWindow — it stays eligible to receive
         // "TaskbarCreated" for the life of the process. See ShellWatchdogWindow for why.
@@ -86,6 +99,7 @@ public partial class App : System.Windows.Application
         _widgetWindow.PreviousRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PreviousAsync());
         _widgetWindow.PlayPauseRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PlayPauseAsync());
         _widgetWindow.NextRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.NextAsync());
+        _widgetWindow.FlyoutToggleRequested += (x, y) => _flyoutWindow?.ToggleFlyout(x, y);
 
         if (_mediaSessionService is not null)
         {
@@ -96,7 +110,29 @@ public partial class App : System.Windows.Application
 
         // Pick up whatever was already playing rather than waiting for the next SMTC event —
         // matters most right after an Explorer restart, where this is a brand-new window.
-        _widgetWindow.UpdateNowPlaying(_mediaSessionService?.CurrentNowPlaying);
+        var initialNowPlaying = _mediaSessionService?.CurrentNowPlaying;
+        _widgetWindow.UpdateNowPlaying(initialNowPlaying);
+        _flyoutWindow?.UpdateNowPlaying(initialNowPlaying);
+    }
+
+    private void ShowFlyoutFromTray()
+    {
+        if (_flyoutWindow is null)
+        {
+            return;
+        }
+
+        if (_widgetWindow is not null)
+        {
+            var (x, y) = _widgetWindow.GetWidgetScreenPosition();
+            _flyoutWindow.ToggleFlyout(x, y);
+        }
+        else
+        {
+            var screenWidth = (int)SystemParameters.PrimaryScreenWidth;
+            var screenHeight = (int)SystemParameters.PrimaryScreenHeight;
+            _flyoutWindow.ToggleFlyout(screenWidth - 370, screenHeight - 60);
+        }
     }
 
     // Transport-control clicks were previously fired with "_ = ...Async()" directly — any fault
@@ -172,7 +208,11 @@ public partial class App : System.Windows.Application
     }
 
     private void OnNowPlayingChanged(NowPlayingInfo? info) =>
-        Dispatcher.InvokeAsync(() => _widgetWindow?.UpdateNowPlaying(info));
+        Dispatcher.InvokeAsync(() =>
+        {
+            _widgetWindow?.UpdateNowPlaying(info);
+            _flyoutWindow?.UpdateNowPlaying(info);
+        });
 
     private void ExitApplication()
     {
@@ -189,6 +229,7 @@ public partial class App : System.Windows.Application
             CloseWidgetWindow(_widgetWindow);
         }
 
+        _flyoutWindow?.Close();
         _shellWatchdog?.Dispose();
         _trayIconService?.Dispose();
         _instanceGuard?.Dispose();

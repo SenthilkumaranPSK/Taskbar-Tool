@@ -13,23 +13,36 @@ internal sealed class TrayIconService : IDisposable
     private readonly NotifyIcon _notifyIcon;
     private readonly ToolStripMenuItem _startupItem;
     private readonly Icon? _ownedIcon;
+    private readonly ToolStripMenuItem _hideWhenIdleItem;
 
     public event EventHandler? ExitRequested;
+    public event EventHandler? FlyoutRequested;
 
     public TrayIconService()
     {
+        var openFlyoutItem = new ToolStripMenuItem("Open Media Flyout");
+        openFlyoutItem.Click += (_, _) => FlyoutRequested?.Invoke(this, EventArgs.Empty);
+
+        _hideWhenIdleItem = new ToolStripMenuItem("Hide widget when idle");
+        _hideWhenIdleItem.Click += OnToggleHideWhenIdle;
+
         _startupItem = new ToolStripMenuItem("Run at startup");
         _startupItem.Click += OnToggleStartup;
 
         var menu = new ContextMenuStrip();
+        menu.Items.Add(openFlyoutItem);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(_hideWhenIdleItem);
         menu.Items.Add(_startupItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty));
 
-        // Re-read the registry each time the menu opens rather than caching at construction —
-        // the Run entry can also be flipped from Task Manager's Startup tab or Settings, and a
-        // tray tick that disagrees with the real state is worse than no tick at all.
-        menu.Opening += (_, _) => _startupItem.Checked = StartupRegistration.IsEnabled();
+        // Re-read settings each time the menu opens
+        menu.Opening += (_, _) =>
+        {
+            _startupItem.Checked = StartupRegistration.IsEnabled();
+            _hideWhenIdleItem.Checked = AppSettings.HideWhenIdle;
+        };
 
         _ownedIcon = TryLoadAppIcon();
 
@@ -40,6 +53,13 @@ internal sealed class TrayIconService : IDisposable
             ContextMenuStrip = menu,
             Visible = true,
         };
+        _notifyIcon.DoubleClick += (_, _) => FlyoutRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnToggleHideWhenIdle(object? sender, EventArgs e)
+    {
+        AppSettings.HideWhenIdle = !AppSettings.HideWhenIdle;
+        _hideWhenIdleItem.Checked = AppSettings.HideWhenIdle;
     }
 
     private void OnToggleStartup(object? sender, EventArgs e)

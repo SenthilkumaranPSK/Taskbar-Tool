@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-TaskbarMediaWidget is a Windows 11 WPF app with a single purpose: show a compact "now playing" media widget genuinely embedded in the real Windows taskbar (not a floating overlay), anchored to the taskbar's left edge. It reflects whatever app is currently playing media via the OS-level System Media Transport Controls (SMTC) — Spotify, browser tabs, YouTube Music, etc.
+**Taskbar Tool** (v1.1; the code namespace is still `TaskbarMediaWidget` — see Naming below) is a Windows 11 WPF app with a single purpose: show a compact "now playing" media widget genuinely embedded in the real Windows taskbar (not a floating overlay), anchored to the taskbar's left edge. It reflects whatever app is currently playing media via the OS-level System Media Transport Controls (SMTC) — Spotify, browser tabs, YouTube Music, etc.
 
 This is a from-scratch reimplementation, inspired by (but not copied from — see licensing note below) [FluentFlyout](https://github.com/unchihugo/FluentFlyout)'s taskbar-widget feature, which was studied as reference and is summarized in `docs/reference-fluentflyout-taskbar-widget.md`. Deliberately out of scope **for the current codebase**: flyouts, volume mixer, lock-key indicators, audio visualizer, MSIX/Store packaging, licensing gates, localization, settings UI. If a feature isn't "show now-playing info docked in the taskbar," it doesn't belong here yet.
 
@@ -21,6 +21,8 @@ This is a from-scratch reimplementation, inspired by (but not copied from — se
 - Single instance enforced via a `Local\`-scoped named mutex (`Core/SingleInstanceGuard.cs`, per-session deliberately — see Gotchas) — running a second copy just exits immediately.
 - Target framework: `net10.0-windows10.0.22000.0` (matches installed SDK 10.0.103; the `10.0.22000.0` suffix is required for the SMTC WinRT APIs).
 - Project targets both `x64` and `ARM64` (`Platforms`/`RuntimeIdentifiers` in the `.csproj`) — a plain `dotnet build` uses the default platform, so pass `-p:Platform=ARM64` (or `-r win-arm64`) when you need to verify the ARM64 path specifically.
+- `dist/` is gitignored and must stay that way: the published .exe is ~231 MB. Note that another agent (Antigravity/Gemini) is also used on this repo and has auto-committed shared working-tree changes before, so an unignored build artifact here is a live hazard, not a hypothetical one.
+- The build is expected to be **0 warnings**. It has been kept there deliberately; treat a new warning as something to fix rather than baseline noise.
 
 ## Architecture
 
@@ -53,6 +55,11 @@ So if you need the taskbar rect somewhere new, call `GetTaskbarRect` freely — 
 ### Media session data
 
 `Media/MediaSessionService.cs` wraps `Dubya.WindowsMediaController.MediaManager` (SMTC wrapper NuGet package — don't hand-roll raw WinRT SMTC interop). Session selection is deliberately simple: prefer the OS-focused session, else the first session that's actually `Playing`, else the first available session, else `null` (nothing playing → widget collapses). No allow/block-list filtering, no "pause other sessions" — that's FluentFlyout-specific scope this app doesn't need. `GetActiveSession()` guards on `IsStarted` and retries once on `InvalidOperationException` before giving up — `CurrentMediaSessions` is a plain, unsynchronized `Dictionary` that the library mutates from SMTC callback threads, so a session opening/closing mid-enumeration is an expected, not exceptional, race.
+
+Two subscription/ordering details in `Start()` exist to fix specific silent failures, and both read as redundant if you don't know why:
+
+- **The bare `_ = RefreshAsync()` immediately after `_mediaManager.Start()` is not belt-and-braces.** `Start()` synchronously fires `OnAnySessionOpened`/`OnAnyMediaPropertyChanged` for sessions that already exist — i.e. music that was already playing before this app launched — *before* it sets its own internal started flag. Those callbacks reach `GetActiveSession()`, which bails on `!IsStarted`, and `RefreshAsync`'s catch-all swallows the rest. Net effect without that extra refresh: launch the app while Spotify is already playing and the widget stays empty until something incidental happens. Don't delete it as a duplicate of the event subscriptions.
+- **`OnFocusedSessionChanged` is subscribed because focus changes are otherwise invisible.** Session selection prefers `GetFocusedSession()`, but nothing else tells this service when the OS's pick changes, so switching between two *already-open* sessions (pausing Spotify, starting a YouTube tab) would never trigger a refresh on its own.
 
 Every SMTC callback triggers `RefreshAsync()` on an arbitrary thread-pool thread, and building a `NowPlayingInfo` involves multiple awaited calls — overlapping refreshes can finish out of order. `RefreshAsync` stamps each call with `Interlocked.Increment(ref _refreshGeneration)` and drops the result if a newer refresh has already started by the time it finishes, so a slow refresh can never overwrite a newer one's output. A 45s heartbeat calls `MediaManager.ForceUpdate()` (plus on `SystemEvents.PowerModeChanged`/`SessionSwitch`) to work around a documented upstream bug where SMTC events can silently stop firing — don't remove this thinking it's redundant with the event subscriptions.
 
@@ -101,7 +108,7 @@ No MVVM framework — plain C# events, wired directly in `App.xaml.cs`: `MediaSe
 
 `App.xaml.cs` also owns the single-instance guard, unhandled-exception logging, and the tray icon (`Tray/TrayIconService.cs` — a `System.Windows.Forms.NotifyIcon` carrying a "Run at startup" toggle and an "Exit" item; Exit is the only way to close the app, since there's no visible main window).
 
-"Run at startup" is backed by `Core/StartupRegistration.cs`, writing `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` — HKCU rather than HKLM for the same reason the single-instance mutex is `Local\`-scoped: this is a per-user app, and HKCU needs no elevation, so the toggle just works instead of prompting for admin. Two details that look like polish but aren't: the registered value is **quoted**, because this repo lives under a path containing spaces and an unquoted `Run` value is parsed at the first space; and `IsEnabled()` returns true only when the entry points at the *current* executable, so a stale entry left by a copy that has since moved reads as "off" rather than showing a tick for a path that no longer launches this build. The tray menu re-reads the registry on `Opening` instead of caching at construction, since Task Manager's Startup tab can flip the same entry behind the app's back.
+"Run at startup" is backed by `Core/StartupRegistration.cs`, writing `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` — HKCU rather than HKLM for the same reason the single-instance mutex is `Local\`-scoped: this is a per-user app, and HKCU needs no elevation, so the toggle just works instead of prompting for admin. Two details that look like polish but aren't: the registered value is **quoted**, because this repo lives under a path containing spaces and an unquoted `Run` value is parsed at the first space; and `IsEnabled()` returns true only when the entry points at the *current* executable, so a stale entry left by a copy that has since moved reads as "off" rather than showing a tick for a path that no longer launches this build. The tray menu re-reads the registry on `Opening` instead of caching at construction, since Task Manager's Startup tab can flip the same entry behind the app's back. Toggling also deletes the pre-1.1 `TaskbarMediaWidget` value name (`LegacyValueName`), so upgrading from an older build can't leave two `Run` entries both launching the widget at logon.
 
 ### Gotchas worth knowing before touching this code
 
@@ -127,14 +134,22 @@ No automated tests are meaningful here — this is live interaction with `explor
 7. Launch a second instance — confirm it exits immediately.
 8. Play tracks with vividly-colored, greyscale, and near-black cover art in turn — confirm the pill picks up a matching tint for the first and stays fully untinted (not a grey wash) for the others.
 9. Tray icon → **Run at startup**: toggle it on, confirm the tick survives closing and reopening the menu and that the entry shows up in Task Manager → Startup apps; toggle it back off and confirm it disappears.
-
-10. Let it sit for a few minutes, then check Task Manager: CPU should read 0% and working set should sit in the 70–100 MB band without climbing indefinitely. CPU that never drops below ~1% means something reintroduced per-tick work — the usual suspect is a UI Automation call back on the poll path. Note the first ~30s after launch legitimately shows several percent (startup, JIT, first render); measure after that.
+10. Confirm the tray shows the custom music-note icon, not the generic stock Windows icon — a fallback to the stock icon means the `<Resource Include>` for `app.ico` was lost (see Gotchas) and is logged as a warning.
+11. Let it sit for a few minutes, then check Task Manager: CPU should read 0% and working set should sit in the 70–100 MB band without climbing indefinitely. CPU that never drops below ~1% means something reintroduced per-tick work — the usual suspect is a UI Automation call back on the poll path. Note the first ~30s after launch legitimately shows several percent (startup, JIT, first render); measure after that.
 
 For anything that misbehaves during these, read `%LOCALAPPDATA%\Taskbar Tool\log.txt` — attach/reattach, SetParent failures, automation timeouts, and Explorer-restart recovery all log there, and it's the only place a swallowed background-task failure becomes visible.
 
 ## Keeping the docs in sync
 
-`README.md` independently restates the scope list, the component table, and the known-limitations list (left-aligned-taskbar overlap, primary monitor only, placeholder tray icon). If you change positioning behavior, scope, or limitations, update it too — it is the user-facing copy of the same facts, not a pointer to this file. `docs/reference-fluentflyout-taskbar-widget.md` is background on the technique and doesn't describe current code, so it only needs changing if the underlying Win32 approach does.
+`README.md` is the user-facing copy of the same facts, not a pointer to this file, and it independently restates several things that go stale together:
+
+- the version badge (currently `1.1.0`) and the install/publish commands,
+- the component table,
+- the **Resource usage** table (CPU, working-set range, installed .exe size) — keep it consistent with the Memory and idle cost section above,
+- the known-limitations list, currently left-aligned-taskbar overlap, single-monitor-only, and no automated tests,
+- the deliberately-out-of-scope list, which duplicates the one at the top of this file.
+
+If you change positioning behavior, scope, limitations, resource characteristics, or the publish shape, update README too. `docs/reference-fluentflyout-taskbar-widget.md` is background on the technique and doesn't describe current code, so it only needs changing if the underlying Win32 approach does. `ROADMAP.md` is aspirational and should not be edited to match implementation work unless a roadmap item actually ships.
 
 ## Licensing note
 
