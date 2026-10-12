@@ -82,6 +82,13 @@ internal sealed class TrayIconService : IDisposable
             ContextMenuStrip = menu,
             Visible = true,
         };
+        _notifyIcon.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                FlyoutRequested?.Invoke(this, EventArgs.Empty);
+            }
+        };
         _notifyIcon.DoubleClick += (_, _) => FlyoutRequested?.Invoke(this, EventArgs.Empty);
     }
 

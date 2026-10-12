@@ -10,6 +10,23 @@ namespace TaskbarMediaWidget.Core;
 internal sealed class SingleInstanceGuard : IDisposable
 {
     private const string MutexName = @"Local\TaskbarTool_SingleInstance";
+    public const string SignalMessageName = "TaskbarTool_ShowFlyoutMessage";
+
+    public static void SignalExistingInstance()
+    {
+        try
+        {
+            var msg = Interop.NativeMethods.RegisterWindowMessage(SignalMessageName);
+            if (msg != 0)
+            {
+                Interop.NativeMethods.PostMessage(new IntPtr(0xffff), msg, IntPtr.Zero, IntPtr.Zero);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to signal existing instance: {ex.Message}");
+        }
+    }
 
     private Mutex? _mutex;
     private bool _owned;

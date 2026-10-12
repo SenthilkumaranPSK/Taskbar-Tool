@@ -18,13 +18,16 @@ namespace TaskbarMediaWidget.Taskbar;
 internal sealed class ShellWatchdogWindow : IDisposable
 {
     private readonly uint _taskbarCreatedMessage;
+    private readonly uint _showFlyoutMessage;
     private HwndSource? _hwndSource;
 
     public event EventHandler? TaskbarCreated;
+    public event EventHandler? ShowFlyoutRequested;
 
     public ShellWatchdogWindow()
     {
         _taskbarCreatedMessage = NativeMethods.RegisterWindowMessage("TaskbarCreated");
+        _showFlyoutMessage = NativeMethods.RegisterWindowMessage(Core.SingleInstanceGuard.SignalMessageName);
 
         var parameters = new HwndSourceParameters("TaskbarMediaWidget.ShellWatchdog")
         {
@@ -43,6 +46,10 @@ internal sealed class ShellWatchdogWindow : IDisposable
         if (msg == (int)_taskbarCreatedMessage)
         {
             TaskbarCreated?.Invoke(this, EventArgs.Empty);
+        }
+        else if (msg == (int)_showFlyoutMessage)
+        {
+            ShowFlyoutRequested?.Invoke(this, EventArgs.Empty);
         }
 
         return IntPtr.Zero;

@@ -49,7 +49,8 @@ public partial class App : System.Windows.Application
         _instanceGuard = new SingleInstanceGuard();
         if (!_instanceGuard.TryAcquire())
         {
-            AppLog.Info("Another instance is already running; exiting.");
+            AppLog.Info("Another instance is already running; signaling existing instance to open UI.");
+            SingleInstanceGuard.SignalExistingInstance();
             Shutdown();
             return;
         }
@@ -99,6 +100,7 @@ public partial class App : System.Windows.Application
         // "TaskbarCreated" for the life of the process. See ShellWatchdogWindow for why.
         _shellWatchdog = new ShellWatchdogWindow();
         _shellWatchdog.TaskbarCreated += (_, _) => _ = HandleExplorerRestartAsync();
+        _shellWatchdog.ShowFlyoutRequested += (_, _) => Dispatcher.InvokeAsync(() => _flyoutWindow?.ToggleFlyout(fromTray: false));
 
         // Start the media pipeline before the window exists, giving its async session-property
         // reads a head start — CreateWidgetWindow also starts the widget hidden regardless (see
@@ -106,6 +108,16 @@ public partial class App : System.Windows.Application
         _mediaSessionService.Start();
         _hardwareMonitorService.Start();
         CreateWidgetWindow();
+
+        var isStartupLaunch = e.Args.Any(a => string.Equals(a, "--startup", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "/startup", StringComparison.OrdinalIgnoreCase));
+        if (!isStartupLaunch)
+        {
+            Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(400);
+                _flyoutWindow?.ToggleFlyout(fromTray: false);
+            });
+        }
 
         ScheduleStartupTrim();
     }

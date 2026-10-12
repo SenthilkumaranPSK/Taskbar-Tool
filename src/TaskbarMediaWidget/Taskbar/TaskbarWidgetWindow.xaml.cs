@@ -32,6 +32,7 @@ public partial class TaskbarWidgetWindow : Window
     private IntPtr _taskbarHandle;
     private HwndSource? _hwndSource;
     private bool _isSetUp;
+    private NowPlayingInfo? _currentNowPlaying;
     private int _lastMeasuredContentVersion = -1;
     private System.Windows.Size _lastNaturalSize;
     private (int X, int Y, int Width, int Height)? _lastAppliedRect;
@@ -97,6 +98,7 @@ public partial class TaskbarWidgetWindow : Window
 
     public void UpdateNowPlaying(NowPlayingInfo? info)
     {
+        _currentNowPlaying = info;
         Widget.SetNowPlaying(info);
 
         if (!_isSetUp)
@@ -181,6 +183,7 @@ public partial class TaskbarWidgetWindow : Window
         _lastAppliedRect = null; // Force a fresh SetWindowPos next tick — we just got a new parent.
         TaskbarLocator.InvalidateRectCache(); // geometry belongs to a different taskbar HWND now
         AppLog.Info("Attached widget window to taskbar.");
+        UpdateNowPlaying(_currentNowPlaying);
     }
 
     private void TryReposition()

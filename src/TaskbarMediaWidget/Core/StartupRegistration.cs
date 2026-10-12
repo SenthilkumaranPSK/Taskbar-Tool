@@ -97,21 +97,21 @@ internal static class StartupRegistration
         var processPath = Environment.ProcessPath;
         if (string.IsNullOrEmpty(processPath))
         {
-            return $"\"{System.IO.Path.Combine(AppContext.BaseDirectory, ExecutableName)}\"";
+            return $"\"{System.IO.Path.Combine(AppContext.BaseDirectory, ExecutableName)}\" --startup";
         }
 
         // Fully qualified: Path is ambiguous with System.Windows.Shapes.Path in a WPF project.
         var fileName = System.IO.Path.GetFileNameWithoutExtension(processPath);
         if (!string.Equals(fileName, "dotnet", StringComparison.OrdinalIgnoreCase))
         {
-            return $"\"{processPath}\"";
+            return $"\"{processPath}\" --startup";
         }
 
         // Deliberately not Assembly.Location: it returns an empty string in a single-file app
         // (IL3000), which is exactly how this ships. BaseDirectory is correct in both layouts.
         var assemblyPath = System.IO.Path.Combine(AppContext.BaseDirectory, AssemblyFileName);
         return System.IO.File.Exists(assemblyPath)
-            ? $"\"{processPath}\" \"{assemblyPath}\""
-            : $"\"{processPath}\"";
+            ? $"\"{processPath}\" \"{assemblyPath}\" --startup"
+            : $"\"{processPath}\" --startup";
     }
 }
