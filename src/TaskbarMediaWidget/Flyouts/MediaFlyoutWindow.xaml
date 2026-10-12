@@ -8,7 +8,7 @@
         ShowInTaskbar="False"
         Topmost="True"
         ResizeMode="NoResize"
-        Width="360"
+        Width="365"
         SizeToContent="Height"
         Focusable="True"
         ShowActivated="True"
@@ -49,6 +49,33 @@
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tab Header Button Style -->
+        <Style x:Key="TabHeaderButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -141,6 +168,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
         <!-- Quick Action Icon Button Style -->
         <Style x:Key="QuickActionButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="36" />
@@ -185,141 +213,172 @@
 
         <Grid Margin="16,14,16,14">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" /> <!-- 0: Top Header -->
-                <RowDefinition Height="Auto" /> <!-- 1: Hero Track Row -->
-                <RowDefinition Height="Auto" /> <!-- 2: Timeline Scrubber -->
-                <RowDefinition Height="Auto" /> <!-- 3: Transport Controls -->
-                <RowDefinition Height="Auto" /> <!-- 4: Bottom Volume Bar -->
-                <RowDefinition Height="Auto" /> <!-- 5: Quick Launch & Actions Bar -->
+                <RowDefinition Height="Auto" /> <!-- 0: Header with Tabs & Close -->
+                <RowDefinition Height="*" />    <!-- 1: Tab Content Host -->
             </Grid.RowDefinitions>
 
-            <!-- 0: Header with Source App Pill & Close Button -->
+            <!-- 0: Header Bar with Source Pill, Tab Selector, and Close Button -->
             <Grid Grid.Row="0" Margin="0,0,0,12">
-                <Border HorizontalAlignment="Left" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Padding="8,3">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="SourceAppText" Text="Media Player" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
-
-                <Button x:Name="CloseButton" Style="{StaticResource FlyoutButtonStyle}" HorizontalAlignment="Right" Width="26" Height="26" Content="" FontSize="10" Click="CloseButton_Click" ToolTip="Close (Esc)" />
-            </Grid>
-
-            <!-- 1: Hero Cover Art + Track Information -->
-            <Grid Grid.Row="1" Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Cover Art with Ambient Shadow -->
-                <Grid Grid.Column="0" Width="82" Height="82">
-                    <Border x:Name="CoverArtGlow" CornerRadius="10" Background="{DynamicResource AccentBrush}" Opacity="0.35">
-                        <Border.Effect>
-                            <BlurEffect Radius="14" />
-                        </Border.Effect>
-                    </Border>
-                    <Border CornerRadius="10" ClipToBounds="True" Background="#1FFFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1">
-                        <Grid>
-                            <TextBlock x:Name="ArtFallbackGlyph" Text="" FontFamily="Segoe Fluent Icons" FontSize="32"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TertiaryTextBrush}" />
-                            <Image x:Name="CoverArtImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                        </Grid>
-                    </Border>
-                </Grid>
-
-                <!-- Track Details -->
-                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="TrackTitleText" Text="No Track Playing" FontSize="15" FontWeight="SemiBold"
-                               Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                    <TextBlock x:Name="ArtistText" Text="Select media to play" FontSize="12"
-                               Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                    <TextBlock x:Name="AlbumText" Text="" FontSize="11"
-                               Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                </StackPanel>
-            </Grid>
-
-            <!-- 2: Timeline Scrubber with Timestamps -->
-            <Grid Grid.Row="2" Margin="0,0,0,8">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <Slider x:Name="SeekSlider" Grid.Row="0" Style="{StaticResource FluentSliderStyle}"
-                        Minimum="0" Maximum="100" Value="0"
-                        PreviewMouseDown="SeekSlider_PreviewMouseDown"
-                        PreviewMouseUp="SeekSlider_PreviewMouseUp" />
-
-                <Grid Grid.Row="1" Margin="2,-2,2,0">
-                    <TextBlock x:Name="CurrentTimeText" Text="0:00" FontSize="11" FontFamily="Segoe UI Variable Text, Segoe UI" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Left" />
-                    <TextBlock x:Name="TotalTimeText" Text="0:00" FontSize="11" FontFamily="Segoe UI Variable Text, Segoe UI" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" />
-                </Grid>
-            </Grid>
-
-            <!-- 3: Transport Controls -->
-            <Grid Grid.Row="3" Margin="0,2,0,8">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Button x:Name="ShuffleButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="14" Click="ShuffleButton_Click" ToolTip="Shuffle" Margin="0,0,8,0" />
-                    <Button x:Name="PrevButton" Style="{StaticResource FlyoutButtonStyle}" Width="40" Height="40" Content="" FontSize="16" Click="PrevButton_Click" ToolTip="Previous Track" Margin="0,0,8,0" />
-                    <Button x:Name="PlayPauseButton" Style="{StaticResource PrimaryHeroButtonStyle}" Width="48" Height="48" Content="" FontSize="20" Click="PlayPauseButton_Click" ToolTip="Play / Pause" Margin="0,0,8,0" />
-                    <Button x:Name="NextButton" Style="{StaticResource FlyoutButtonStyle}" Width="40" Height="40" Content="" FontSize="16" Click="NextButton_Click" ToolTip="Next Track" Margin="0,0,8,0" />
-                    <Button x:Name="RepeatButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="14" Click="RepeatButton_Click" ToolTip="Repeat" />
-                </StackPanel>
-            </Grid>
-
-            <!-- 4: Bottom Volume Bar -->
-            <Border Grid.Row="4" Margin="0,4,0,0" Padding="8,6" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="8">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <Button x:Name="VolumeMuteButton" Grid.Column="0" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="13" Click="VolumeMuteButton_Click" ToolTip="Toggle Mute" />
-
-                    <TextBlock Grid.Column="1" Text="Use mouse scroll over widget for volume" FontSize="10.5" Foreground="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-
-                    <StackPanel Grid.Column="2" Orientation="Horizontal">
-                        <Button x:Name="VolumeDownButton" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="12" Click="VolumeDownButton_Click" ToolTip="Volume Down" Margin="0,0,2,0" />
-                        <Button x:Name="VolumeUpButton" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="12" Click="VolumeUpButton_Click" ToolTip="Volume Up" />
+                <!-- Source App Badge -->
+                <Border Grid.Column="0" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Padding="8,3" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="SourceAppText" Text="Media" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
                     </StackPanel>
-                </Grid>
-            </Border>
+                </Border>
 
-            <!-- 5: Quick Launch & System Actions Bar -->
-            <Border Grid.Row="5" Margin="0,10,0,0" Padding="10,8" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <!-- Center Tab Navigation Strip -->
+                <Border Grid.Column="1" HorizontalAlignment="Center" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="8" Padding="2" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="TabPlayerBtn" Style="{StaticResource TabHeaderButtonStyle}" Content="Player" Click="TabPlayerBtn_Click" />
+                        <Button x:Name="TabLyricsBtn" Style="{StaticResource TabHeaderButtonStyle}" Content="Lyrics" Click="TabLyricsBtn_Click" />
+                        <Button x:Name="TabToolsBtn" Style="{StaticResource TabHeaderButtonStyle}" Content="Tools" Click="TabToolsBtn_Click" />
+                    </StackPanel>
+                </Border>
 
-                    <!-- Header: Quick Tools + Hardware Stats Badge -->
-                    <Grid Grid.Row="0" Margin="2,0,2,8">
-                        <TextBlock Text="QUICK LAUNCH" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TertiaryTextBrush}" VerticalAlignment="Center" />
-                        <Border x:Name="HwBadge" HorizontalAlignment="Right" Background="{DynamicResource FlyoutBgBrush}" CornerRadius="8" Padding="6,2" Cursor="Hand" MouseDown="HwBadge_MouseDown" ToolTip="Live Hardware Usage • Click for Task Manager">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
-                                <TextBlock x:Name="HwStatsText" Text="CPU 0%  •  RAM 0%" FontSize="10" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Border>
+                <!-- Close Button -->
+                <Button Grid.Column="2" x:Name="CloseButton" Style="{StaticResource FlyoutButtonStyle}" Width="26" Height="26" Content="" FontSize="10" Click="CloseButton_Click" ToolTip="Close (Esc)" VerticalAlignment="Center" />
+            </Grid>
+
+            <!-- 1: TAB CONTENT CONTAINER -->
+            <Grid Grid.Row="1">
+                <!-- ================= TAB 1: PLAYER VIEW ================= -->
+                <StackPanel x:Name="TabPlayerPanel" Visibility="Visible">
+                    <!-- Hero Cover Art + Track Info -->
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Cover Art with Glow -->
+                        <Grid Grid.Column="0" Width="82" Height="82">
+                            <Border x:Name="CoverArtGlow" CornerRadius="10" Background="{DynamicResource AccentBrush}" Opacity="0.35">
+                                <Border.Effect>
+                                    <BlurEffect Radius="14" />
+                                </Border.Effect>
+                            </Border>
+                            <Border CornerRadius="10" ClipToBounds="True" Background="#1FFFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1">
+                                <Grid>
+                                    <TextBlock x:Name="ArtFallbackGlyph" Text="" FontFamily="Segoe Fluent Icons" FontSize="32"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TertiaryTextBrush}" />
+                                    <Image x:Name="CoverArtImage" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- Track Details -->
+                        <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="TrackTitleText" Text="No Track Playing" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                            <TextBlock x:Name="ArtistText" Text="Select media to play" FontSize="12"
+                                       Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                            <TextBlock x:Name="AlbumText" Text="" FontSize="11"
+                                       Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                        </StackPanel>
                     </Grid>
 
-                    <!-- Action Buttons Strip -->
-                    <UniformGrid Grid.Row="1" Rows="1" Columns="8" HorizontalAlignment="Stretch">
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE774;" ToolTip="Google Chrome" Click="LaunchChrome_Click" />
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xED25;" ToolTip="File Explorer" Click="LaunchExplorer_Click" />
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE756;" ToolTip="Windows Terminal" Click="LaunchTerminal_Click" />
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE8C8;" ToolTip="Snipping Tool" Click="LaunchSnippingTool_Click" />
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE70B;" ToolTip="Notepad" Click="LaunchNotepad_Click" />
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE8EF;" ToolTip="Calculator" Click="LaunchCalculator_Click" />
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE9D9;" ToolTip="Task Manager" Click="LaunchTaskManager_Click" />
-                        <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE72E;" ToolTip="Lock PC" Click="LockWorkstation_Click" />
-                    </UniformGrid>
+                    <!-- Timeline Scrubber -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Slider x:Name="SeekSlider" Grid.Row="0" Style="{StaticResource FluentSliderStyle}"
+                                Minimum="0" Maximum="100" Value="0"
+                                PreviewMouseDown="SeekSlider_PreviewMouseDown"
+                                PreviewMouseUp="SeekSlider_PreviewMouseUp" />
+                        <Grid Grid.Row="1" Margin="2,-2,2,0">
+                            <TextBlock x:Name="CurrentTimeText" Text="0:00" FontSize="11" FontFamily="Segoe UI Variable Text, Segoe UI" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="TotalTimeText" Text="0:00" FontSize="11" FontFamily="Segoe UI Variable Text, Segoe UI" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- Transport Controls -->
+                    <Grid Margin="0,2,0,10">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Button x:Name="ShuffleButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="14" Click="ShuffleButton_Click" ToolTip="Shuffle" Margin="0,0,8,0" />
+                            <Button x:Name="PrevButton" Style="{StaticResource FlyoutButtonStyle}" Width="40" Height="40" Content="" FontSize="16" Click="PrevButton_Click" ToolTip="Previous Track" Margin="0,0,8,0" />
+                            <Button x:Name="PlayPauseButton" Style="{StaticResource PrimaryHeroButtonStyle}" Width="48" Height="48" Content="" FontSize="20" Click="PlayPauseButton_Click" ToolTip="Play / Pause" Margin="0,0,8,0" />
+                            <Button x:Name="NextButton" Style="{StaticResource FlyoutButtonStyle}" Width="40" Height="40" Content="" FontSize="16" Click="NextButton_Click" ToolTip="Next Track" Margin="0,0,8,0" />
+                            <Button x:Name="RepeatButton" Style="{StaticResource FlyoutButtonStyle}" Width="36" Height="36" Content="" FontSize="14" Click="RepeatButton_Click" ToolTip="Repeat" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Windows Master Volume Bar with CoreAudio Slider -->
+                    <Border Margin="0,2,0,0" Padding="10,6" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="VolumeMuteButton" Grid.Column="0" Style="{StaticResource FlyoutButtonStyle}" Width="28" Height="28" Content="" FontSize="13" Click="VolumeMuteButton_Click" ToolTip="Toggle Mute" />
+                            <Slider x:Name="MasterVolumeSlider" Grid.Column="1" Style="{StaticResource FluentSliderStyle}" Minimum="0" Maximum="100" Margin="10,0"
+                                    ValueChanged="MasterVolumeSlider_ValueChanged" />
+                            <TextBlock x:Name="VolumePercentText" Grid.Column="2" Text="100%" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" Width="34" TextAlignment="Right" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- ================= TAB 2: SYNCHRONIZED LYRICS VIEW ================= -->
+                <Grid x:Name="TabLyricsPanel" Visibility="Collapsed" Height="270">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Margin="0,0,0,8" Padding="4,2">
+                        <TextBlock x:Name="LyricsHeaderStatus" Text="Synchronized Lyrics" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Center" />
+                    </Border>
+
+                    <!-- Lyrics Scroll Container -->
+                    <ScrollViewer x:Name="LyricsScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="LyricsStackPanel" Margin="0,40,0,40" VerticalAlignment="Center" HorizontalAlignment="Stretch" />
+                    </ScrollViewer>
                 </Grid>
-            </Border>
+
+                <!-- ================= TAB 3: TOOLS & SYSTEM LAUNCHER ================= -->
+                <StackPanel x:Name="TabToolsPanel" Visibility="Collapsed">
+                    <!-- Hardware Stats Banner -->
+                    <Border Margin="0,0,0,10" Padding="10,8" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Cursor="Hand" MouseDown="HwBadge_MouseDown" ToolTip="Click to open Task Manager">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="SYSTEM HARDWARE" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="HwStatsText" Text="CPU 0%  •  RAM 0%" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Quick App Grid -->
+                    <Border Padding="10,8" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="QUICK LAUNCH SHORTCUTS" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource TertiaryTextBrush}" Margin="2,0,0,8" />
+                            <UniformGrid Grid.Row="1" Rows="1" Columns="8" HorizontalAlignment="Stretch">
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE774;" ToolTip="Google Chrome" Click="LaunchChrome_Click" />
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xED25;" ToolTip="File Explorer" Click="LaunchExplorer_Click" />
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE756;" ToolTip="Windows Terminal" Click="LaunchTerminal_Click" />
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE8C8;" ToolTip="Snipping Tool" Click="LaunchSnippingTool_Click" />
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE70B;" ToolTip="Notepad" Click="LaunchNotepad_Click" />
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE8EF;" ToolTip="Calculator" Click="LaunchCalculator_Click" />
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE7F3;" ToolTip="Sound Settings" Click="LaunchSoundSettings_Click" />
+                                <Button Style="{StaticResource QuickActionButtonStyle}" Content="&#xE72E;" ToolTip="Lock PC" Click="LockWorkstation_Click" />
+                            </UniformGrid>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
         </Grid>
     </Border>
 </Window>

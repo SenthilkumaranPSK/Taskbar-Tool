@@ -80,7 +80,7 @@ public partial class TaskbarWidgetWindow : Window
         {
             var taskbarRect = TaskbarLocator.GetTaskbarRect(_taskbarHandle);
             var dpiScale = TaskbarLocator.GetDpiScale(_taskbarHandle);
-            var startX = (int)Math.Round(LeftEdgeMarginLogicalPx * dpiScale);
+            var startX = (int)Math.Round(GetLeftEdgeMarginLogicalPx() * dpiScale);
             return (taskbarRect.Left + startX, taskbarRect.Top);
         }
 
@@ -193,11 +193,25 @@ public partial class TaskbarWidgetWindow : Window
         CalculateAndSetPosition();
     }
 
-    // Anchored to the taskbar's own left edge, independent of the Start button — chosen over
-    // docking next to Start because Start sits in the middle of the screen on a Center-aligned
-    // taskbar (the Windows 11 default), and this widget is meant to always be reachable at the
-    // same spot regardless of taskbar alignment or how many icons are pinned.
-    private const double LeftEdgeMarginLogicalPx = 6;
+    private static double GetLeftEdgeMarginLogicalPx()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
+            if (key?.GetValue("TaskbarAl") is int al && al == 0)
+            {
+                // Left-aligned taskbar: Start button and Search icon occupy the first ~94 DIPs.
+                // Shift past them so the widget sits neatly without covering the Start button.
+                return 96.0;
+            }
+        }
+        catch
+        {
+            // fallback
+        }
+
+        return 6.0; // Center-aligned taskbar (Windows 11 default)
+    }
 
     private void CalculateAndSetPosition()
     {
@@ -220,7 +234,7 @@ public partial class TaskbarWidgetWindow : Window
             _lastMeasuredContentVersion = Widget.ContentVersion;
         }
 
-        var startX = (int)Math.Round(LeftEdgeMarginLogicalPx * dpiScale);
+        var startX = (int)Math.Round(GetLeftEdgeMarginLogicalPx() * dpiScale);
         var physicalWidth = (int)Math.Round(_lastNaturalSize.Width * dpiScale);
         var physicalHeight = (int)Math.Round(_lastNaturalSize.Height * dpiScale);
         var y = (int)Math.Round((taskbarRect.Height - physicalHeight) / 2.0);

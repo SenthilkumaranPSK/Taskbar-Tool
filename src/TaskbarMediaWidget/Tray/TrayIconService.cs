@@ -14,14 +14,30 @@ internal sealed class TrayIconService : IDisposable
     private readonly ToolStripMenuItem _startupItem;
     private readonly Icon? _ownedIcon;
     private readonly ToolStripMenuItem _hideWhenIdleItem;
+    private readonly ToolStripMenuItem _transparencyModeItem;
+    private readonly ToolStripMenuItem _hotkeyItem;
+    private readonly ToolStripMenuItem _showProgressBarItem;
+    private readonly ToolStripMenuItem _showEqualizerItem;
 
     public event EventHandler? ExitRequested;
     public event EventHandler? FlyoutRequested;
 
     public TrayIconService()
     {
-        var openFlyoutItem = new ToolStripMenuItem("Open Media Flyout");
+        var openFlyoutItem = new ToolStripMenuItem("Open Media Flyout (Win+Shift+Z)");
         openFlyoutItem.Click += (_, _) => FlyoutRequested?.Invoke(this, EventArgs.Empty);
+
+        _transparencyModeItem = new ToolStripMenuItem("Transparency mode");
+        _transparencyModeItem.Click += OnToggleTransparencyMode;
+
+        _hotkeyItem = new ToolStripMenuItem("Global shortcut (Win+Shift+Z)");
+        _hotkeyItem.Click += OnToggleHotkey;
+
+        _showProgressBarItem = new ToolStripMenuItem("Show track progress bar");
+        _showProgressBarItem.Click += OnToggleProgressBar;
+
+        _showEqualizerItem = new ToolStripMenuItem("Show animated equalizer");
+        _showEqualizerItem.Click += OnToggleEqualizer;
 
         _hideWhenIdleItem = new ToolStripMenuItem("Hide widget when idle");
         _hideWhenIdleItem.Click += OnToggleHideWhenIdle;
@@ -32,6 +48,10 @@ internal sealed class TrayIconService : IDisposable
         var menu = new ContextMenuStrip();
         menu.Items.Add(openFlyoutItem);
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(_transparencyModeItem);
+        menu.Items.Add(_hotkeyItem);
+        menu.Items.Add(_showProgressBarItem);
+        menu.Items.Add(_showEqualizerItem);
         menu.Items.Add(_hideWhenIdleItem);
         menu.Items.Add(_startupItem);
         menu.Items.Add(new ToolStripSeparator());
@@ -42,6 +62,10 @@ internal sealed class TrayIconService : IDisposable
         {
             _startupItem.Checked = StartupRegistration.IsEnabled();
             _hideWhenIdleItem.Checked = AppSettings.HideWhenIdle;
+            _transparencyModeItem.Checked = AppSettings.TransparencyMode;
+            _hotkeyItem.Checked = AppSettings.GlobalHotkeyEnabled;
+            _showProgressBarItem.Checked = AppSettings.ShowProgressBar;
+            _showEqualizerItem.Checked = AppSettings.ShowEqualizer;
         };
 
         _ownedIcon = TryLoadAppIcon();
@@ -54,6 +78,30 @@ internal sealed class TrayIconService : IDisposable
             Visible = true,
         };
         _notifyIcon.DoubleClick += (_, _) => FlyoutRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnToggleTransparencyMode(object? sender, EventArgs e)
+    {
+        AppSettings.TransparencyMode = !AppSettings.TransparencyMode;
+        _transparencyModeItem.Checked = AppSettings.TransparencyMode;
+    }
+
+    private void OnToggleHotkey(object? sender, EventArgs e)
+    {
+        AppSettings.GlobalHotkeyEnabled = !AppSettings.GlobalHotkeyEnabled;
+        _hotkeyItem.Checked = AppSettings.GlobalHotkeyEnabled;
+    }
+
+    private void OnToggleProgressBar(object? sender, EventArgs e)
+    {
+        AppSettings.ShowProgressBar = !AppSettings.ShowProgressBar;
+        _showProgressBarItem.Checked = AppSettings.ShowProgressBar;
+    }
+
+    private void OnToggleEqualizer(object? sender, EventArgs e)
+    {
+        AppSettings.ShowEqualizer = !AppSettings.ShowEqualizer;
+        _showEqualizerItem.Checked = AppSettings.ShowEqualizer;
     }
 
     private void OnToggleHideWhenIdle(object? sender, EventArgs e)

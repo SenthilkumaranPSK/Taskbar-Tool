@@ -25,6 +25,7 @@ public partial class App : System.Windows.Application
     private MediaFlyoutWindow? _flyoutWindow;
     private ShellWatchdogWindow? _shellWatchdog;
     private HardwareMonitorService? _hardwareMonitorService;
+    private GlobalHotkeyService? _hotkeyService;
     private bool _explorerRestarting;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -65,7 +66,15 @@ public partial class App : System.Windows.Application
         _flyoutWindow.RepeatRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.ToggleRepeatAsync());
         _flyoutWindow.SeekRequested += target => _ = RunCommandAsync(_mediaSessionService!.SeekAsync(target));
 
-        AppSettings.SettingsChanged += (_, _) => Dispatcher.Invoke(() => _widgetWindow?.UpdateNowPlaying(_mediaSessionService?.CurrentNowPlaying));
+        _hotkeyService = new GlobalHotkeyService();
+        _hotkeyService.HotkeyPressed += (_, _) => Dispatcher.InvokeAsync(() => _flyoutWindow?.ToggleFlyout(fromTray: false));
+
+        AppSettings.SettingsChanged += (_, _) => Dispatcher.Invoke(() =>
+        {
+            _hotkeyService?.SetEnabled(AppSettings.GlobalHotkeyEnabled);
+            _widgetWindow?.UpdateNowPlaying(_mediaSessionService?.CurrentNowPlaying);
+            _flyoutWindow?.ApplyTheme(ThemeDetector.IsSystemLightTheme());
+        });
 
         // Never reparented, so — unlike TaskbarWidgetWindow — it stays eligible to receive
         // "TaskbarCreated" for the life of the process. See ShellWatchdogWindow for why.
@@ -239,6 +248,7 @@ public partial class App : System.Windows.Application
         }
 
         _flyoutWindow?.Close();
+        _hotkeyService?.Dispose();
         _shellWatchdog?.Dispose();
         _trayIconService?.Dispose();
         _instanceGuard?.Dispose();

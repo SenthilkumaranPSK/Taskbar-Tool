@@ -1,27 +1,23 @@
-using TaskbarMediaWidget.Interop;
-
 namespace TaskbarMediaWidget.Core;
 
 /// <summary>
-/// Provides volume adjustments that invoke Windows' standard volume overlay (OSD).
+/// Provides high-precision volume adjustments via native CoreAudio APIs.
 /// </summary>
 internal static class VolumeHelper
 {
-    public static void VolumeUp()
-    {
-        NativeMethods.keybd_event(NativeMethods.VK_VOLUME_UP, 0, NativeMethods.KEYEVENTF_EXTENDEDKEY, UIntPtr.Zero);
-        NativeMethods.keybd_event(NativeMethods.VK_VOLUME_UP, 0, NativeMethods.KEYEVENTF_EXTENDEDKEY | NativeMethods.KEYEVENTF_KEYUP, UIntPtr.Zero);
-    }
+    private static readonly CoreAudioVolumeService Service = new();
 
-    public static void VolumeDown()
-    {
-        NativeMethods.keybd_event(NativeMethods.VK_VOLUME_DOWN, 0, NativeMethods.KEYEVENTF_EXTENDEDKEY, UIntPtr.Zero);
-        NativeMethods.keybd_event(NativeMethods.VK_VOLUME_DOWN, 0, NativeMethods.KEYEVENTF_EXTENDEDKEY | NativeMethods.KEYEVENTF_KEYUP, UIntPtr.Zero);
-    }
+    public static CoreAudioVolumeService Current => Service;
 
-    public static void ToggleMute()
-    {
-        NativeMethods.keybd_event(NativeMethods.VK_VOLUME_MUTE, 0, NativeMethods.KEYEVENTF_EXTENDEDKEY, UIntPtr.Zero);
-        NativeMethods.keybd_event(NativeMethods.VK_VOLUME_MUTE, 0, NativeMethods.KEYEVENTF_EXTENDEDKEY | NativeMethods.KEYEVENTF_KEYUP, UIntPtr.Zero);
-    }
+    public static int GetVolumePercent() => Service.GetVolumePercent();
+
+    public static void SetVolumePercent(int percent) => Service.SetVolumePercent(percent);
+
+    public static bool IsMuted() => Service.IsMuted();
+
+    public static void VolumeUp() => Service.VolumeUp(stepPercent: 2);
+
+    public static void VolumeDown() => Service.VolumeDown(stepPercent: 2);
+
+    public static void ToggleMute() => Service.ToggleMute();
 }

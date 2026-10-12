@@ -19,7 +19,9 @@ The widget docks flush against the taskbar's left edge and shows cover art, an a
   ═══════════════════ (live progress bar)
 ```
 
-- **Interactive Flyout**: Left-clicking the widget opens a sleek Windows 11 Fluent 2 flyout above the taskbar with a scrubbable timeline slider, large album art, source app badge, volume control, and shuffle/repeat buttons.
+- **Interactive Flyout**: Left-clicking the widget or pressing **`Win + Shift + Z`** opens a sleek Windows 11 Fluent 2 flyout above the taskbar with a scrubbable timeline slider, large album art, source app badge, volume control, and shuffle/repeat buttons.
+- **Global Shortcut (`Win + Shift + Z`)**: Toggle the media flyout instantly from anywhere in Windows with a single keyboard shortcut.
+- **Transparency Mode**: Seamless transparent/glass layout mode for both the taskbar widget and flyout, perfect for translucent or minimalist taskbar setups.
 - **Mouse Volume Control**: Hovering over the widget and scrolling the mouse wheel smoothly turns system volume up or down (triggering Windows 11's native volume OSD); middle-clicking toggles mute.
 - **Dynamic Accent**: The pill picks up a subtle tint sampled from the album art's dominant color.
 - **Standby Mode**: When nothing is playing, the widget displays a clean standby pill so you always know it's ready (or can be configured to hide completely via the tray menu).
@@ -79,8 +81,9 @@ The app has no visible main window — it's tray-only. Right-click the tray icon
 | `Media/MediaSessionService.cs` | Wraps [`WindowsMediaController`](https://github.com/DubyaDude/WindowsMediaController) (an SMTC wrapper) and manages playback, timeline, and session selection |
 | `Media/ThumbnailConverter.cs` | Decodes an SMTC thumbnail stream into a WPF `BitmapImage` |
 | `Media/AccentColorExtractor.cs` | Reduces that thumbnail to one vibrant color (weighted hue histogram) for the pill tint |
+| `Core/GlobalHotkeyService.cs` | System-wide global hotkey manager registering `Win + Shift + Z` to toggle the media flyout |
 | `Core/StartupRegistration.cs` | Reads/writes the `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry behind the tray's "Run at startup" toggle |
-| `Tray/TrayIconService.cs` | Notification area icon with "Open Media Flyout", "Hide widget when idle", "Run at startup", and "Exit" |
+| `Tray/TrayIconService.cs` | Notification area icon with "Open Media Flyout", "Transparency mode", "Global shortcut", "Hide widget when idle", "Run at startup", and "Exit" |
 
 Full architectural notes, gotchas, and the reasoning behind non-obvious decisions live in [`CLAUDE.md`](CLAUDE.md).
 

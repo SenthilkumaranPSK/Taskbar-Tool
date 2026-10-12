@@ -89,6 +89,17 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
             MediaContentGrid.Visibility = Visibility.Collapsed;
             StandbyLauncherPanel.Visibility = Visibility.Visible;
 
+            if (AppSettings.TransparencyMode)
+            {
+                StandbyAppBadge.Background = System.Windows.Media.Brushes.Transparent;
+                StandbyCpuBadge.Background = System.Windows.Media.Brushes.Transparent;
+            }
+            else
+            {
+                StandbyAppBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF));
+                StandbyCpuBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF));
+            }
+
             ToolTip = "Taskbar Tool • Standby Launcher\nClick shortcuts to open apps | Click icon for Flyout";
 
             if (_lastTitle != null)
@@ -138,18 +149,26 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         ToolTip = $"🎵 {title}\n👤 {info.Artist}{timeStr}\n🔊 Scroll: Volume | Left Click: Open Controls";
 
         // Equalizer animation
-        EqualizerBars.Visibility = Visibility.Visible;
-        if (info.IsPlaying)
+        if (AppSettings.ShowEqualizer)
         {
-            StartEqualizer();
+            EqualizerBars.Visibility = Visibility.Visible;
+            if (info.IsPlaying)
+            {
+                StartEqualizer();
+            }
+            else
+            {
+                PauseEqualizer();
+            }
         }
         else
         {
-            PauseEqualizer();
+            EqualizerBars.Visibility = Visibility.Collapsed;
+            StopEqualizer();
         }
 
         // Track Progress Bar
-        if (info.Duration > TimeSpan.Zero)
+        if (AppSettings.ShowProgressBar && info.Duration > TimeSpan.Zero)
         {
             ProgressBarTrack.Visibility = Visibility.Visible;
             UpdateProgressBar(info.ProgressFraction);
@@ -250,6 +269,14 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         }
 
         _accentColor = accent;
+
+        if (AppSettings.TransparencyMode)
+        {
+            Resources["AccentBrush"] = new SolidColorBrush(accent ?? System.Windows.Media.Color.FromRgb(0x60, 0xCD, 0xFF));
+            PillBorder.Background = System.Windows.Media.Brushes.Transparent;
+            PillBorder.BorderBrush = System.Windows.Media.Brushes.Transparent;
+            return;
+        }
 
         if (accent is not { } color)
         {
@@ -441,6 +468,12 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 
     private void OnMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (AppSettings.TransparencyMode)
+        {
+            PillBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF));
+            return;
+        }
+
         if (_accentColor is null)
         {
             PillBorder.Background = (System.Windows.Media.Brush)Resources["PillHoverBgBrush"];
@@ -449,6 +482,12 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 
     private void OnMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (AppSettings.TransparencyMode)
+        {
+            PillBorder.Background = System.Windows.Media.Brushes.Transparent;
+            return;
+        }
+
         if (_accentColor is null)
         {
             PillBorder.Background = (System.Windows.Media.Brush)Resources["PillBaseBgBrush"];
