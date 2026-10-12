@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.Win32;
 using TaskbarMediaWidget.Core;
+using TaskbarMediaWidget.Interop;
 using WindowsMediaController;
 using static WindowsMediaController.MediaManager;
 
@@ -169,17 +170,151 @@ internal sealed class MediaSessionService : IDisposable
     // pausing Spotify and starting a YouTube tab) never triggered a refresh on its own.
     private void OnFocusedSessionChanged(MediaSession mediaSession) => _ = RefreshAsync();
 
-    /// <summary>
-    /// Session selection, simplest-first: prefer the session the OS considers "focused," else
-    /// the first session that's actually Playing, else just the first available session, else
-    /// null (nothing playing anywhere — widget should collapse).
-    /// </summary>
-    private MediaSession? GetActiveSession()
+    private string? _pinnedSessionId;
+
+    public void SelectSession(string sessionId)
     {
-        if (!_mediaManager.IsStarted)
+        _pinnedSessionId = sessionId;
+        _ = RefreshAsync();
+    }
+
+    public void SelectNextSession()
+    {
+        var sessions = GetValidSessions();
+        if (sessions.Count <= 1) return;
+
+        var current = GetActiveSession();
+        var index = current is not null ? sessions.FindIndex(s => s.Id == current.Id) : -1;
+        var nextIndex = (index + 1) % sessions.Count;
+        _pinnedSessionId = sessions[nextIndex].Id;
+        _ = RefreshAsync();
+    }
+
+    public async Task<IReadOnlyList<MediaSessionModel>> GetAvailableSessionsAsync()
+    {
+        var result = new List<MediaSessionModel>();
+        var sessions = GetValidSessions();
+        var active = GetActiveSession();
+
+        foreach (var s in sessions)
         {
-            return null;
+            var isSelected = active is not null && s.Id == active.Id;
+            var isPlaying = s.ControlSession?.GetPlaybackInfo()?.PlaybackStatus ==
+                            Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+            var appName = ResolveSourceApp(s);
+            var title = string.Empty;
+            var artist = string.Empty;
+
+            try
+            {
+                if (s.ControlSession is not null)
+                {
+                    var props = await s.ControlSession.TryGetMediaPropertiesAsync();
+                    if (props is not null)
+                    {
+                        title = props.Title ?? string.Empty;
+                        artist = props.Artist ?? string.Empty;
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to empty strings
+            }
+
+            result.Add(new MediaSessionModel(
+                Id: s.Id,
+                AppId: appName,
+                Title: string.IsNullOrWhiteSpace(title) ? appName : title,
+                Artist: artist,
+                IsPlaying: isPlaying,
+                IsSelected: isSelected));
         }
+
+        return result;
+    }
+
+    public void FocusActiveSessionApp()
+    {
+        try
+        {
+            var session = GetActiveSession();
+            if (session is null) return;
+
+            var rawId = session.ControlSession?.SourceAppUserModelId ?? session.Id ?? string.Empty;
+            AppLog.Info($"Focusing source app for session: {rawId}");
+
+            var candidateName = System.IO.Path.GetFileNameWithoutExtension(rawId);
+            if (candidateName.Contains('!'))
+            {
+                candidateName = candidateName.Substring(candidateName.LastIndexOf('!') + 1);
+            }
+
+            var procs = System.Diagnostics.Process.GetProcesses();
+            System.Diagnostics.Process? targetProc = null;
+
+            foreach (var p in procs)
+            {
+                try
+                {
+                    if (string.Equals(p.ProcessName, candidateName, StringComparison.OrdinalIgnoreCase) ||
+                        rawId.Contains(p.ProcessName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (p.MainWindowHandle != IntPtr.Zero)
+                        {
+                            targetProc = p;
+                            break;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (targetProc != null && targetProc.MainWindowHandle != IntPtr.Zero)
+            {
+                var hwnd = targetProc.MainWindowHandle;
+                NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
+                NativeMethods.SetForegroundWindow(hwnd);
+                return;
+            }
+
+            NativeMethods.EnumWindows((hwnd, _) =>
+            {
+                if (!NativeMethods.IsWindowVisible(hwnd)) return true;
+                NativeMethods.GetWindowThreadProcessId(hwnd, out var pid);
+                try
+                {
+                    var p = System.Diagnostics.Process.GetProcessById((int)pid);
+                    if (rawId.Contains(p.ProcessName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
+                        NativeMethods.SetForegroundWindow(hwnd);
+                        return false;
+                    }
+                }
+                catch { }
+                return true;
+            }, IntPtr.Zero);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to focus source app: {ex.Message}");
+        }
+    }
+
+    private static bool IsAppIgnored(MediaSession session)
+    {
+        var ignored = AppSettings.IgnoredApps;
+        if (string.IsNullOrWhiteSpace(ignored)) return false;
+
+        var source = session.ControlSession?.SourceAppUserModelId ?? session.Id ?? string.Empty;
+        var tokens = ignored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return tokens.Any(t => source.Contains(t, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private List<MediaSession> GetValidSessions()
+    {
+        if (!_mediaManager.IsStarted) return [];
 
         List<MediaSession> sessions;
         try
@@ -188,23 +323,38 @@ internal sealed class MediaSessionService : IDisposable
         }
         catch (InvalidOperationException)
         {
-            // CurrentMediaSessions is a plain Dictionary mutated from SMTC callback threads with
-            // no synchronization; a session opening/closing mid-enumeration throws here. Retry
-            // once against a fresh snapshot rather than letting the fault propagate — this runs
-            // on both UI-thread button clicks and background refreshes.
             try
             {
                 sessions = _mediaManager.CurrentMediaSessions.Values.ToList();
             }
             catch (InvalidOperationException)
             {
-                return null;
+                return [];
             }
         }
 
+        return sessions.Where(s => !IsAppIgnored(s)).ToList();
+    }
+
+    /// <summary>
+    /// Session selection: pinned user choice first, else focused, else playing, else first.
+    /// </summary>
+    private MediaSession? GetActiveSession()
+    {
+        var sessions = GetValidSessions();
         if (sessions.Count == 0)
         {
             return null;
+        }
+
+        if (!string.IsNullOrEmpty(_pinnedSessionId))
+        {
+            var pinned = sessions.FirstOrDefault(s => s.Id == _pinnedSessionId);
+            if (pinned is not null)
+            {
+                return pinned;
+            }
+            _pinnedSessionId = null;
         }
 
         var focused = _mediaManager.GetFocusedSession();
@@ -293,7 +443,9 @@ internal sealed class MediaSessionService : IDisposable
             CanSeek: controls?.IsPlaybackPositionEnabled ?? false,
             IsShuffleActive: playbackInfo?.IsShuffleActive,
             AutoRepeatMode: playbackInfo?.AutoRepeatMode,
-            AccentColor: accent);
+            AccentColor: accent,
+            SessionId: session.Id,
+            AvailableSessionsCount: GetValidSessions().Count);
     }
 
     private static string ResolveSourceApp(MediaSession session)
@@ -373,3 +525,11 @@ internal sealed class MediaSessionService : IDisposable
         _mediaManager.Dispose();
     }
 }
+
+public sealed record MediaSessionModel(
+    string Id,
+    string AppId,
+    string Title,
+    string Artist,
+    bool IsPlaying,
+    bool IsSelected);

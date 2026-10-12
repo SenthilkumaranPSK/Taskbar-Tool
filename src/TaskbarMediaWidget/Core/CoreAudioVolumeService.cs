@@ -158,6 +158,69 @@ internal sealed class CoreAudioVolumeService : IDisposable
         SetVolumePercent(next);
     }
 
+    public record AudioDeviceItem(string Id, string Name, bool IsDefault);
+
+    public IReadOnlyList<AudioDeviceItem> GetAudioPlaybackDevices()
+    {
+        var list = new List<AudioDeviceItem>();
+        try
+        {
+            var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+            string? defaultId = null;
+            if (enumerator.GetDefaultAudioEndpoint(0, 1, out var defDevice) == 0 && defDevice is not null)
+            {
+                defDevice.GetId(out defaultId);
+            }
+
+            if (enumerator.EnumAudioEndpoints(0, 1, out var pCollection) == 0 && pCollection != IntPtr.Zero)
+            {
+                var collection = (IMMDeviceCollection)Marshal.GetObjectForIUnknown(pCollection);
+                collection.GetCount(out var count);
+                for (uint i = 0; i < count; i++)
+                {
+                    if (collection.Item(i, out var device) == 0 && device is not null)
+                    {
+                        device.GetId(out var id);
+                        var name = id;
+                        if (device.OpenPropertyStore(0, out var pStore) == 0 && pStore != IntPtr.Zero)
+                        {
+                            var store = (IPropertyStore)Marshal.GetObjectForIUnknown(pStore);
+                            var key = new PropertyKey { fmtid = new Guid("a45c254e-df1c-4efd-8020-67d146a850e0"), pid = 14 };
+                            if (store.GetValue(ref key, out var pv) == 0 && pv.ptrVal != IntPtr.Zero)
+                            {
+                                name = Marshal.PtrToStringUni(pv.ptrVal) ?? id;
+                            }
+                        }
+                        list.Add(new AudioDeviceItem(id, name, string.Equals(id, defaultId, StringComparison.OrdinalIgnoreCase)));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to list audio devices: {ex.Message}");
+        }
+        return list;
+    }
+
+    public bool SwitchDefaultAudioDevice(string deviceId)
+    {
+        try
+        {
+            var policy = (IPolicyConfig)new PolicyConfigComObject();
+            policy.SetDefaultEndpoint(deviceId, 0); // eConsole
+            policy.SetDefaultEndpoint(deviceId, 1); // eMultimedia
+            policy.SetDefaultEndpoint(deviceId, 2); // eCommunications
+            Initialize();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to switch default audio endpoint: {ex.Message}");
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         _endpointVolume = null;
@@ -167,6 +230,57 @@ internal sealed class CoreAudioVolumeService : IDisposable
     // COM Interop definitions
     [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
     private class MMDeviceEnumeratorComObject { }
+
+    [ComImport, Guid("870af99c-171d-4f9e-af0d-e63df40c2bc9")]
+    private class PolicyConfigComObject { }
+
+    [Guid("f8679f50-850a-4129-9dc1-69e6386ac8fb"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IPolicyConfig
+    {
+        [PreserveSig] int GetMixFormat(string pszDeviceName, IntPtr ppFormat);
+        [PreserveSig] int GetDeviceFormat(string pszDeviceName, bool bDefault, IntPtr ppFormat);
+        [PreserveSig] int ResetDeviceFormat(string pszDeviceName);
+        [PreserveSig] int SetDeviceFormat(string pszDeviceName, IntPtr pEndpointFormat, IntPtr mixFormat);
+        [PreserveSig] int GetProcessingPeriod(string pszDeviceName, bool bDefault, IntPtr pmftDefaultPeriod, IntPtr pmftMinimumPeriod);
+        [PreserveSig] int SetProcessingPeriod(string pszDeviceName, IntPtr pmftPeriod);
+        [PreserveSig] int GetShareMode(string pszDeviceName, IntPtr pMode);
+        [PreserveSig] int SetShareMode(string pszDeviceName, IntPtr mode);
+        [PreserveSig] int GetPropertyValue(string pszDeviceName, bool bFxStore, IntPtr key, IntPtr pv);
+        [PreserveSig] int SetPropertyValue(string pszDeviceName, bool bFxStore, IntPtr key, IntPtr pv);
+        [PreserveSig] int SetDefaultEndpoint(string pszDeviceName, int role);
+        [PreserveSig] int SetEndpointVisibility(string pszDeviceName, bool bVisible);
+    }
+
+    [Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IMMDeviceCollection
+    {
+        [PreserveSig] int GetCount(out uint count);
+        [PreserveSig] int Item(uint index, out IMMDevice device);
+    }
+
+    [Guid("886D8EEB-8CF2-4446-8D02-C33284CD4D87"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IPropertyStore
+    {
+        [PreserveSig] int GetCount(out uint count);
+        [PreserveSig] int GetAt(uint index, out PropertyKey key);
+        [PreserveSig] int GetValue(ref PropertyKey key, out PropVariant value);
+        [PreserveSig] int SetValue(ref PropertyKey key, ref PropVariant value);
+        [PreserveSig] int Commit();
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PropertyKey
+    {
+        public Guid fmtid;
+        public uint pid;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct PropVariant
+    {
+        [FieldOffset(0)] public short vt;
+        [FieldOffset(8)] public IntPtr ptrVal;
+    }
 
     [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IMMDeviceEnumerator

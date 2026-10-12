@@ -225,13 +225,16 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Source App Badge -->
-                <Border Grid.Column="0" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Padding="8,3" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="SourceAppText" Text="Media" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
+                <!-- Source App Badge & Session Switch -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border x:Name="SourceAppBadge" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Padding="8,3" Cursor="Hand" MouseDown="SourceAppBadge_MouseDown" ToolTip="Click to bring playing app to front">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="SourceAppText" Text="Media" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Button x:Name="BtnNextSession" Style="{StaticResource FlyoutButtonStyle}" Width="24" Height="24" Margin="3,0,0,0" Content="&#xE8AB;" FontSize="10" Click="BtnNextSession_Click" ToolTip="Switch to next media session" Visibility="Collapsed" />
+                </StackPanel>
 
                 <!-- Center Tab Navigation Strip -->
                 <Border Grid.Column="1" HorizontalAlignment="Center" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="8" Padding="2" VerticalAlignment="Center">
@@ -242,8 +245,11 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Close Button -->
-                <Button Grid.Column="2" x:Name="CloseButton" Style="{StaticResource FlyoutButtonStyle}" Width="26" Height="26" Content="" FontSize="10" Click="CloseButton_Click" ToolTip="Close (Esc)" VerticalAlignment="Center" />
+                <!-- Settings & Close Buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="SettingsButton" Style="{StaticResource FlyoutButtonStyle}" Width="26" Height="26" Content="&#xE713;" FontSize="11" Click="SettingsButton_Click" ToolTip="Settings" Margin="0,0,2,0" />
+                    <Button x:Name="CloseButton" Style="{StaticResource FlyoutButtonStyle}" Width="26" Height="26" Content="" FontSize="10" Click="CloseButton_Click" ToolTip="Close (Esc)" />
+                </StackPanel>
             </Grid>
 
             <!-- 1: TAB CONTENT CONTAINER -->
@@ -275,8 +281,16 @@
 
                         <!-- Track Details -->
                         <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="TrackTitleText" Text="No Track Playing" FontSize="15" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" x:Name="TrackTitleText" Text="No Track Playing" FontSize="15" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource PrimaryTextBrush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                <Button Grid.Column="1" x:Name="BtnCopyTrack" Style="{StaticResource FlyoutButtonStyle}" Width="24" Height="24"
+                                        Content="&#xE8C8;" FontSize="10" Click="BtnCopyTrack_Click" ToolTip="Copy 'Artist - Title'" Margin="4,0,0,0" />
+                            </Grid>
                             <TextBlock x:Name="ArtistText" Text="Select media to play" FontSize="12"
                                        Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                             <TextBlock x:Name="AlbumText" Text="" FontSize="11"
@@ -347,13 +361,35 @@
                 <!-- ================= TAB 3: TOOLS & SYSTEM LAUNCHER ================= -->
                 <StackPanel x:Name="TabToolsPanel" Visibility="Collapsed">
                     <!-- Hardware Stats Banner -->
-                    <Border Margin="0,0,0,10" Padding="10,8" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Cursor="Hand" MouseDown="HwBadge_MouseDown" ToolTip="Click to open Task Manager">
+                    <Border Margin="0,0,0,8" Padding="10,8" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10" Cursor="Hand" MouseDown="HwBadge_MouseDown" ToolTip="Click to open Task Manager">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
                                 <TextBlock Text="SYSTEM HARDWARE" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                             <TextBlock x:Name="HwStatsText" Text="CPU 0%  •  RAM 0%" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Network & Power Banner -->
+                    <Border Margin="0,0,0,8" Padding="10,7" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="NetStatsText" Text="↓ 0 KB/s  •  ↑ 0 KB/s" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock x:Name="BatteryStatsText" Text="" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Audio Output Device Switcher Banner -->
+                    <Border Margin="0,0,0,10" Padding="10,7" Background="{DynamicResource PillBadgeBgBrush}" CornerRadius="10">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE7F3;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock x:Name="AudioDeviceText" Text="Default Audio Device" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Button HorizontalAlignment="Right" Style="{StaticResource FlyoutButtonStyle}" Content="Switch Device" FontSize="10" Padding="6,2" Click="SwitchAudioDevice_Click" ToolTip="Cycle audio playback device" />
                         </Grid>
                     </Border>
 

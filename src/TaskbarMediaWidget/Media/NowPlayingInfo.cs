@@ -21,7 +21,9 @@ public sealed record NowPlayingInfo(
     bool CanSeek,
     bool? IsShuffleActive = null,
     MediaPlaybackAutoRepeatMode? AutoRepeatMode = null,
-    System.Windows.Media.Color? AccentColor = null)
+    System.Windows.Media.Color? AccentColor = null,
+    string? SessionId = null,
+    int AvailableSessionsCount = 1)
 {
     public bool IsPlaying => PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
 

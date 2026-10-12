@@ -9,8 +9,19 @@
              Cursor="Hand"
              PreviewMouseWheel="OnPreviewMouseWheel"
              PreviewMouseDown="OnPreviewMouseDown"
+             MouseDoubleClick="OnMouseDoubleClick"
              MouseEnter="OnMouseEnter"
              MouseLeave="OnMouseLeave">
+    <UserControl.ContextMenu>
+        <ContextMenu x:Name="WidgetContextMenu">
+            <MenuItem x:Name="MenuCopyTrack" Header="Copy Track Info (Artist - Title)" Click="MenuCopyTrack_Click" />
+            <MenuItem x:Name="MenuFocusApp" Header="Bring Playing App to Front" Click="MenuFocusApp_Click" />
+            <MenuItem x:Name="MenuNextSession" Header="Next Media Session" Click="MenuNextSession_Click" />
+            <Separator />
+            <MenuItem x:Name="MenuOpenFlyout" Header="Open Media Flyout (Win+Shift+Z)" Click="MenuOpenFlyout_Click" />
+            <MenuItem x:Name="MenuOpenSettings" Header="Settings..." Click="MenuOpenSettings_Click" />
+        </ContextMenu>
+    </UserControl.ContextMenu>
     <UserControl.Resources>
         <SolidColorBrush x:Key="PrimaryTextBrush" Color="White" />
         <SolidColorBrush x:Key="SecondaryTextBrush" Color="#B8FFFFFF" />
@@ -126,6 +137,14 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="&#xE9D9;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
                             <TextBlock x:Name="StandbyCpuText" Text="CPU 0%" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Live Network Speed Badge -->
+                    <Border x:Name="StandbyNetBadge" Height="22" CornerRadius="4" Background="#16FFFFFF" Padding="5,0" Margin="2,0,0,0" ToolTip="Live Network Speed" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10" Foreground="{DynamicResource AccentBrush}" Margin="0,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="StandbyNetText" Text="↓ 0K" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

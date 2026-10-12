@@ -34,12 +34,17 @@ public partial class MediaFlyoutWindow : Window
     private string? _currentLyricsKey;
     private int _activeLyricIndex = -1;
 
+    private readonly CoreAudioVolumeService _audioService = new();
+
     public event EventHandler? PreviousRequested;
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
     public event EventHandler? ShuffleRequested;
     public event EventHandler? RepeatRequested;
     public event Action<TimeSpan>? SeekRequested;
+    public event EventHandler? FocusAppRequested;
+    public event EventHandler? NextSessionRequested;
+    public event EventHandler? SettingsRequested;
 
     public MediaFlyoutWindow()
     {
@@ -121,6 +126,7 @@ public partial class MediaFlyoutWindow : Window
             ArtistText.Text = "Start media playback to see controls";
             AlbumText.Text = string.Empty;
             SourceAppText.Text = "Media";
+            BtnNextSession.Visibility = Visibility.Collapsed;
             CoverArtImage.Source = null;
             ArtFallbackGlyph.Visibility = Visibility.Visible;
             CoverArtGlow.Visibility = Visibility.Collapsed;
@@ -134,6 +140,9 @@ public partial class MediaFlyoutWindow : Window
             ResetLyricsUi("Start media playback to load lyrics.");
             return;
         }
+
+        BtnNextSession.Visibility = info.AvailableSessionsCount > 1 ? Visibility.Visible : Visibility.Collapsed;
+        BtnNextSession.ToolTip = $"Switch session ({info.AvailableSessionsCount} active)";
 
         TrackTitleText.Text = string.IsNullOrWhiteSpace(info.Title) ? "Unknown Track" : info.Title;
         ArtistText.Text = string.IsNullOrWhiteSpace(info.Artist) ? "Unknown Artist" : info.Artist;
@@ -433,10 +442,34 @@ public partial class MediaFlyoutWindow : Window
         HwStatsText.Text = $"CPU {cpuPercent}%  •  RAM {ramPercent}%";
     }
 
+    public void UpdateHardwareStats(HardwareStats stats)
+    {
+        HwStatsText.Text = $"CPU {stats.CpuPercent}%  •  RAM {stats.RamPercent}%";
+        if (NetStatsText is not null)
+        {
+            var down = stats.DownloadSpeedKbps >= 1024 ? $"{stats.DownloadSpeedKbps / 1024.0:F1} MB/s" : $"{stats.DownloadSpeedKbps:F0} KB/s";
+            var up = stats.UploadSpeedKbps >= 1024 ? $"{stats.UploadSpeedKbps / 1024.0:F1} MB/s" : $"{stats.UploadSpeedKbps:F0} KB/s";
+            NetStatsText.Text = $"↓ {down}  •  ↑ {up}";
+        }
+        if (BatteryStatsText is not null)
+        {
+            if (stats.BatteryPercent.HasValue)
+            {
+                var icon = stats.IsCharging == true ? "⚡" : "🔋";
+                BatteryStatsText.Text = $"{icon} {stats.BatteryPercent.Value}%";
+            }
+            else
+            {
+                BatteryStatsText.Text = string.Empty;
+            }
+        }
+    }
+
     public void ShowFlyout(bool fromTray = false)
     {
         ApplyTheme(ThemeDetector.IsSystemLightTheme());
         SyncVolumeUi();
+        RefreshAudioDeviceName();
         PositionAbove(fromTray);
 
         Opacity = 0;
@@ -551,6 +584,83 @@ public partial class MediaFlyoutWindow : Window
         {
             QuickLaunchHelper.LaunchTaskManager();
             Hide();
+        }
+    }
+
+    private void SourceAppBadge_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            FocusAppRequested?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void BtnNextSession_Click(object sender, RoutedEventArgs e) => NextSessionRequested?.Invoke(this, EventArgs.Empty);
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
+
+    private async void BtnCopyTrack_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentInfo is not null)
+        {
+            try
+            {
+                var text = string.IsNullOrWhiteSpace(_currentInfo.Artist)
+                    ? _currentInfo.Title
+                    : $"{_currentInfo.Artist} - {_currentInfo.Title}";
+                System.Windows.Clipboard.SetText(text);
+
+                BtnCopyTrack.Content = "\uE73E"; // Checkmark
+                await Task.Delay(1300);
+                BtnCopyTrack.Content = "\uE8C8"; // Copy glyph
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn($"Failed to copy track: {ex.Message}");
+            }
+        }
+    }
+
+    private void SwitchAudioDevice_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var devices = _audioService.GetAudioPlaybackDevices();
+            if (devices.Count <= 1) return;
+
+            var currentIndex = -1;
+            for (var i = 0; i < devices.Count; i++)
+            {
+                if (devices[i].IsDefault)
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            var nextIndex = (currentIndex + 1) % devices.Count;
+            var nextDevice = devices[nextIndex];
+            _audioService.SwitchDefaultAudioDevice(nextDevice.Id);
+            RefreshAudioDeviceName();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"Failed to switch audio device: {ex.Message}");
+        }
+    }
+
+    private void RefreshAudioDeviceName()
+    {
+        if (AudioDeviceText is null) return;
+        try
+        {
+            var devices = _audioService.GetAudioPlaybackDevices();
+            var def = devices.FirstOrDefault(d => d.IsDefault);
+            AudioDeviceText.Text = def is not null ? def.Name : "Default Audio Device";
+        }
+        catch
+        {
+            AudioDeviceText.Text = "Default Audio Device";
         }
     }
 

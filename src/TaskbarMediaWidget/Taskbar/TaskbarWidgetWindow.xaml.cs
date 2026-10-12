@@ -40,6 +40,10 @@ public partial class TaskbarWidgetWindow : Window
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
     public event EventHandler? FlyoutToggleRequested;
+    public event EventHandler? CopyTrackRequested;
+    public event EventHandler? FocusAppRequested;
+    public event EventHandler? NextSessionRequested;
+    public event EventHandler? SettingsRequested;
 
     public TaskbarWidgetWindow()
     {
@@ -52,6 +56,10 @@ public partial class TaskbarWidgetWindow : Window
         Widget.PlayPauseRequested += (_, _) => PlayPauseRequested?.Invoke(this, EventArgs.Empty);
         Widget.NextRequested += (_, _) => NextRequested?.Invoke(this, EventArgs.Empty);
         Widget.FlyoutToggleRequested += (_, _) => FlyoutToggleRequested?.Invoke(this, EventArgs.Empty);
+        Widget.CopyTrackRequested += (_, _) => CopyTrackRequested?.Invoke(this, EventArgs.Empty);
+        Widget.FocusAppRequested += (_, _) => FocusAppRequested?.Invoke(this, EventArgs.Empty);
+        Widget.NextSessionRequested += (_, _) => NextSessionRequested?.Invoke(this, EventArgs.Empty);
+        Widget.SettingsRequested += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
         _pollTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -121,6 +129,16 @@ public partial class TaskbarWidgetWindow : Window
     public void UpdateHardwareStats(int cpuPercent, int ramPercent)
     {
         Widget.UpdateHardwareStats(cpuPercent, ramPercent);
+    }
+
+    public void UpdateHardwareStats(HardwareStats stats)
+    {
+        Widget.UpdateHardwareStats(stats.CpuPercent, stats.RamPercent, stats.DownloadSpeedKbps, stats.UploadSpeedKbps);
+    }
+
+    public void UpdateAudioLevels(float bass, float mid, float treble)
+    {
+        Widget.UpdateAudioLevels(bass, mid, treble);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -195,14 +213,15 @@ public partial class TaskbarWidgetWindow : Window
 
     private static double GetLeftEdgeMarginLogicalPx()
     {
+        var baseMargin = 6.0;
         try
         {
             using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
             if (key?.GetValue("TaskbarAl") is int al && al == 0)
             {
-                // Left-aligned taskbar: Start button and Search icon occupy the first ~94 DIPs.
-                // Shift past them so the widget sits neatly without covering the Start button.
-                return 96.0;
+                // Left-aligned taskbar: Start button and Search icon occupy ~140-160 DIPs.
+                // Shift past them so the widget sits neatly without covering Start or Search.
+                baseMargin = 148.0;
             }
         }
         catch
@@ -210,7 +229,7 @@ public partial class TaskbarWidgetWindow : Window
             // fallback
         }
 
-        return 6.0; // Center-aligned taskbar (Windows 11 default)
+        return Math.Max(0.0, baseMargin + AppSettings.TaskbarOffsetPx);
     }
 
     private void CalculateAndSetPosition()

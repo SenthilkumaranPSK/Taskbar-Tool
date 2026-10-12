@@ -21,11 +21,15 @@ internal sealed class TrayIconService : IDisposable
 
     public event EventHandler? ExitRequested;
     public event EventHandler? FlyoutRequested;
+    public event EventHandler? SettingsRequested;
 
     public TrayIconService()
     {
         var openFlyoutItem = new ToolStripMenuItem("Open Media Flyout (Win+Shift+Z)");
         openFlyoutItem.Click += (_, _) => FlyoutRequested?.Invoke(this, EventArgs.Empty);
+
+        var settingsItem = new ToolStripMenuItem("Settings...");
+        settingsItem.Click += (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
         _transparencyModeItem = new ToolStripMenuItem("Transparency mode");
         _transparencyModeItem.Click += OnToggleTransparencyMode;
@@ -55,6 +59,7 @@ internal sealed class TrayIconService : IDisposable
         menu.Items.Add(_hideWhenIdleItem);
         menu.Items.Add(_startupItem);
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(settingsItem);
         menu.Items.Add("Exit", null, (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty));
 
         // Re-read settings each time the menu opens

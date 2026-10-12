@@ -1,8 +1,11 @@
 using System.Windows;
+using TaskbarMediaWidget.Audio;
 using TaskbarMediaWidget.Core;
 using TaskbarMediaWidget.Flyouts;
+using TaskbarMediaWidget.Integrations;
 using TaskbarMediaWidget.Interop;
 using TaskbarMediaWidget.Media;
+using TaskbarMediaWidget.Settings;
 using TaskbarMediaWidget.Taskbar;
 using TaskbarMediaWidget.Tray;
 
@@ -26,6 +29,9 @@ public partial class App : System.Windows.Application
     private ShellWatchdogWindow? _shellWatchdog;
     private HardwareMonitorService? _hardwareMonitorService;
     private GlobalHotkeyService? _hotkeyService;
+    private DiscordRpcService? _discordRpcService;
+    private WasapiAudioVisualizerService? _visualizerService;
+    private SettingsWindow? _settingsWindow;
     private bool _explorerRestarting;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -50,13 +56,23 @@ public partial class App : System.Windows.Application
 
         AppLog.Info("Starting Taskbar Tool.");
 
+        _discordRpcService = new DiscordRpcService();
+        _discordRpcService.Start();
+
+        _visualizerService = new WasapiAudioVisualizerService();
+        _visualizerService.AudioLevelsChanged += (bass, mid, treble) =>
+            Dispatcher.InvokeAsync(() => _widgetWindow?.UpdateAudioLevels(bass, mid, treble));
+        _visualizerService.Start();
+
         _hardwareMonitorService = new HardwareMonitorService();
         _hardwareMonitorService.UsageUpdated += OnHardwareUsageUpdated;
+        _hardwareMonitorService.StatsUpdated += OnHardwareStatsUpdated;
 
         _mediaSessionService = new MediaSessionService();
         _trayIconService = new TrayIconService();
         _trayIconService.ExitRequested += (_, _) => ExitApplication();
         _trayIconService.FlyoutRequested += (_, _) => ShowFlyoutFromTray();
+        _trayIconService.SettingsRequested += (_, _) => OpenSettingsWindow();
 
         _flyoutWindow = new MediaFlyoutWindow();
         _flyoutWindow.PreviousRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PreviousAsync());
@@ -65,6 +81,9 @@ public partial class App : System.Windows.Application
         _flyoutWindow.ShuffleRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.ToggleShuffleAsync());
         _flyoutWindow.RepeatRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.ToggleRepeatAsync());
         _flyoutWindow.SeekRequested += target => _ = RunCommandAsync(_mediaSessionService!.SeekAsync(target));
+        _flyoutWindow.FocusAppRequested += (_, _) => _mediaSessionService?.FocusActiveSessionApp();
+        _flyoutWindow.NextSessionRequested += (_, _) => _mediaSessionService?.SelectNextSession();
+        _flyoutWindow.SettingsRequested += (_, _) => OpenSettingsWindow();
 
         _hotkeyService = new GlobalHotkeyService();
         _hotkeyService.HotkeyPressed += (_, _) => Dispatcher.InvokeAsync(() => _flyoutWindow?.ToggleFlyout(fromTray: false));
@@ -114,6 +133,9 @@ public partial class App : System.Windows.Application
         _widgetWindow.PlayPauseRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.PlayPauseAsync());
         _widgetWindow.NextRequested += (_, _) => _ = RunCommandAsync(_mediaSessionService!.NextAsync());
         _widgetWindow.FlyoutToggleRequested += (_, _) => _flyoutWindow?.ToggleFlyout(fromTray: false);
+        _widgetWindow.FocusAppRequested += (_, _) => _mediaSessionService?.FocusActiveSessionApp();
+        _widgetWindow.NextSessionRequested += (_, _) => _mediaSessionService?.SelectNextSession();
+        _widgetWindow.SettingsRequested += (_, _) => OpenSettingsWindow();
 
         if (_mediaSessionService is not null)
         {
@@ -217,6 +239,16 @@ public partial class App : System.Windows.Application
         {
             _widgetWindow?.UpdateNowPlaying(info);
             _flyoutWindow?.UpdateNowPlaying(info);
+            _discordRpcService?.UpdateActivity(info);
+
+            if (info?.IsPlaying == true)
+            {
+                _visualizerService?.Resume();
+            }
+            else
+            {
+                _visualizerService?.Pause();
+            }
         });
 
     private void OnHardwareUsageUpdated(int cpu, int ram) =>
@@ -226,6 +258,28 @@ public partial class App : System.Windows.Application
             _flyoutWindow?.UpdateHardwareStats(cpu, ram);
         });
 
+    private void OnHardwareStatsUpdated(HardwareStats stats) =>
+        Dispatcher.InvokeAsync(() =>
+        {
+            _widgetWindow?.UpdateHardwareStats(stats);
+            _flyoutWindow?.UpdateHardwareStats(stats);
+        });
+
+    private void OpenSettingsWindow() =>
+        Dispatcher.Invoke(() =>
+        {
+            if (_settingsWindow is null || !_settingsWindow.IsLoaded)
+            {
+                _settingsWindow = new SettingsWindow();
+                _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+                _settingsWindow.Show();
+            }
+            else
+            {
+                _settingsWindow.Activate();
+            }
+        });
+
     private void ExitApplication()
     {
         AppLog.Info("Exit requested from tray icon.");
@@ -233,7 +287,23 @@ public partial class App : System.Windows.Application
         if (_hardwareMonitorService is not null)
         {
             _hardwareMonitorService.UsageUpdated -= OnHardwareUsageUpdated;
+            _hardwareMonitorService.StatsUpdated -= OnHardwareStatsUpdated;
             _hardwareMonitorService.Dispose();
+        }
+
+        if (_visualizerService is not null)
+        {
+            _visualizerService.Dispose();
+        }
+
+        if (_discordRpcService is not null)
+        {
+            _discordRpcService.Dispose();
+        }
+
+        if (_settingsWindow is not null)
+        {
+            _settingsWindow.Close();
         }
 
         if (_mediaSessionService is not null)

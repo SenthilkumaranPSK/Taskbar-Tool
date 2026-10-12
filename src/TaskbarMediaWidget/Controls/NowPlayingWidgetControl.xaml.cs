@@ -30,6 +30,10 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
     public event EventHandler? PlayPauseRequested;
     public event EventHandler? NextRequested;
     public event EventHandler? FlyoutToggleRequested;
+    public event EventHandler? CopyTrackRequested;
+    public event EventHandler? FocusAppRequested;
+    public event EventHandler? NextSessionRequested;
+    public event EventHandler? SettingsRequested;
 
     public NowPlayingWidgetControl()
     {
@@ -141,24 +145,23 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
         PlayPauseButton.SetValue(AutomationProperties.NameProperty, info.IsPlaying ? "Pause" : "Play");
 
         ApplyAccent(info.AccentColor);
+        ApplyLayoutMode();
 
         // Tooltip feedback
         var timeStr = info.Duration > TimeSpan.Zero
             ? $"\n⏱ {NowPlayingInfo.FormatTime(info.CurrentPosition)} / {NowPlayingInfo.FormatTime(info.Duration)}"
             : string.Empty;
-        ToolTip = $"🎵 {title}\n👤 {info.Artist}{timeStr}\n🔊 Scroll: Volume | Left Click: Open Controls";
+        var multiStr = info.AvailableSessionsCount > 1 ? $"\n(Session 1 of {info.AvailableSessionsCount} • Double-click: focus app | Right-click: switch)" : "\n(Double-click: focus app | Right-click: options)";
+        ToolTip = $"🎵 {title}\n👤 {info.Artist}{timeStr}\n🔊 Scroll: Volume | Left Click: Open Controls{multiStr}";
 
-        // Equalizer animation
-        if (AppSettings.ShowEqualizer)
+        // Equalizer animation / visualizer
+        if (AppSettings.ShowEqualizer && AppSettings.WidgetLayout != WidgetLayoutStyle.Compact && AppSettings.WidgetLayout != WidgetLayoutStyle.Minimal)
         {
             EqualizerBars.Visibility = Visibility.Visible;
-            if (info.IsPlaying)
+            if (!AppSettings.RealSpectrumEnabled)
             {
-                StartEqualizer();
-            }
-            else
-            {
-                PauseEqualizer();
+                if (info.IsPlaying) StartEqualizer();
+                else PauseEqualizer();
             }
         }
         else
@@ -443,11 +446,114 @@ public partial class NowPlayingWidgetControl : System.Windows.Controls.UserContr
 
     private void NextButton_Click(object sender, RoutedEventArgs e) => NextRequested?.Invoke(this, EventArgs.Empty);
 
-    public void UpdateHardwareStats(int cpuPercent, int ramPercent)
+    public void UpdateHardwareStats(int cpuPercent, int ramPercent, double downKb = 0, double upKb = 0)
     {
         StandbyCpuText.Text = $"CPU {cpuPercent}%";
         StandbyCpuBadge.ToolTip = $"CPU: {cpuPercent}% | RAM: {ramPercent}%\nClick to open Task Manager";
+
+        if (StandbyNetText is not null)
+        {
+            var netStr = downKb >= 1024 ? $"↓ {downKb / 1024.0:F1}M" : $"↓ {(int)downKb}K";
+            StandbyNetText.Text = netStr;
+            StandbyNetBadge.ToolTip = $"Network Download: {downKb:F1} KB/s\nNetwork Upload: {upKb:F1} KB/s";
+        }
     }
+
+    public void UpdateAudioLevels(float bass, float mid, float treble)
+    {
+        if (!AppSettings.ShowEqualizer || !AppSettings.RealSpectrumEnabled || _currentInfo?.IsPlaying != true)
+        {
+            return;
+        }
+
+        EqBar1.Height = Math.Clamp(3 + bass * 11, 2, 14);
+        EqBar2.Height = Math.Clamp(3 + mid * 12, 2, 14);
+        EqBar3.Height = Math.Clamp(2 + treble * 10, 2, 14);
+    }
+
+    private void ApplyLayoutMode()
+    {
+        switch (AppSettings.WidgetLayout)
+        {
+            case WidgetLayoutStyle.Compact:
+                TextClip.Visibility = Visibility.Collapsed;
+                PreviousButton.Visibility = Visibility.Collapsed;
+                NextButton.Visibility = Visibility.Collapsed;
+                PlayPauseButton.Visibility = Visibility.Visible;
+                EqualizerBars.Visibility = Visibility.Collapsed;
+                break;
+            case WidgetLayoutStyle.Minimal:
+                TextClip.Visibility = Visibility.Visible;
+                TextClip.Width = 100;
+                CoverArt.Visibility = Visibility.Collapsed;
+                ArtFallback.Visibility = Visibility.Visible;
+                TransportPanel.Visibility = Visibility.Collapsed;
+                EqualizerBars.Visibility = Visibility.Collapsed;
+                break;
+            case WidgetLayoutStyle.Wide:
+                TextClip.Visibility = Visibility.Visible;
+                TextClip.Width = 175;
+                CoverArt.Visibility = Visibility.Visible;
+                TransportPanel.Visibility = Visibility.Visible;
+                PreviousButton.Visibility = Visibility.Visible;
+                NextButton.Visibility = Visibility.Visible;
+                PlayPauseButton.Visibility = Visibility.Visible;
+                EqualizerBars.Visibility = AppSettings.ShowEqualizer ? Visibility.Visible : Visibility.Collapsed;
+                break;
+            case WidgetLayoutStyle.Standard:
+            default:
+                TextClip.Visibility = Visibility.Visible;
+                TextClip.Width = 125;
+                CoverArt.Visibility = Visibility.Visible;
+                TransportPanel.Visibility = Visibility.Visible;
+                PreviousButton.Visibility = Visibility.Visible;
+                NextButton.Visibility = Visibility.Visible;
+                PlayPauseButton.Visibility = Visibility.Visible;
+                EqualizerBars.Visibility = AppSettings.ShowEqualizer ? Visibility.Visible : Visibility.Collapsed;
+                break;
+        }
+    }
+
+    private void OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            if (e.OriginalSource is DependencyObject dep && FindParentButton(dep) is not null)
+            {
+                return;
+            }
+
+            FocusAppRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+    }
+
+    private void MenuCopyTrack_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentInfo is not null)
+        {
+            try
+            {
+                var text = string.IsNullOrWhiteSpace(_currentInfo.Artist)
+                    ? _currentInfo.Title
+                    : $"{_currentInfo.Artist} - {_currentInfo.Title}";
+                System.Windows.Clipboard.SetText(text);
+                CopyTrackRequested?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Warn($"Failed to copy track info: {ex.Message}");
+            }
+        }
+    }
+
+    private void MenuFocusApp_Click(object sender, RoutedEventArgs e) => FocusAppRequested?.Invoke(this, EventArgs.Empty);
+
+    private void MenuNextSession_Click(object sender, RoutedEventArgs e) => NextSessionRequested?.Invoke(this, EventArgs.Empty);
+
+    private void MenuOpenFlyout_Click(object sender, RoutedEventArgs e) => FlyoutToggleRequested?.Invoke(this, EventArgs.Empty);
+
+    private void MenuOpenSettings_Click(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
     private void StandbyChromeBtn_Click(object sender, RoutedEventArgs e) => QuickLaunchHelper.LaunchChrome();
 
