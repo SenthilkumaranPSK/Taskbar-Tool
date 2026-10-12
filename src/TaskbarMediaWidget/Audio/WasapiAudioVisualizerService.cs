@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using TaskbarMediaWidget.Core;
+using TaskbarMediaWidget.Interop;
 
 namespace TaskbarMediaWidget.Audio;
 
@@ -255,58 +256,5 @@ internal sealed class WasapiAudioVisualizerService : IDisposable
     {
         Stop();
         _captureThread = null;
-    }
-
-    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-    private class MMDeviceEnumeratorComObject { }
-
-    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceEnumerator
-    {
-        [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
-        [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
-    }
-
-    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDevice
-    {
-        [PreserveSig] int Activate([In] ref Guid iid, int clsCtx, IntPtr activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object interfacePointer);
-    }
-
-    [Guid("1CB9AD4C-DBFA-4c32-B178-C2F568A703B2"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IAudioClient
-    {
-        [PreserveSig] int Initialize(int shareMode, int streamFlags, long bufferDuration, long periodicity, IntPtr waveFormat, [In] Guid audioSessionGuid);
-        [PreserveSig] int GetBufferSize(out uint numBufferFrames);
-        [PreserveSig] int GetStreamLatency(out long latency);
-        [PreserveSig] int GetCurrentPadding(out uint numPaddingFrames);
-        [PreserveSig] int IsFormatSupported(int shareMode, IntPtr waveFormat, out IntPtr closestMatch);
-        [PreserveSig] int GetMixFormat(out IntPtr deviceFormatPointer);
-        [PreserveSig] int GetDevicePeriod(out long defaultDevicePeriod, out long minimumDevicePeriod);
-        [PreserveSig] int Start();
-        [PreserveSig] int Stop();
-        [PreserveSig] int Reset();
-        [PreserveSig] int SetEventHandle(IntPtr eventHandle);
-        [PreserveSig] int GetService([In] ref Guid riid, [MarshalAs(UnmanagedType.IUnknown)] out object interfacePointer);
-    }
-
-    [Guid("C8ADBD64-E71E-48a0-A4DE-185C395CD317"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IAudioCaptureClient
-    {
-        [PreserveSig] int GetBuffer(out IntPtr dataPointer, out uint numFramesToRead, out uint flags, out ulong devicePosition, out ulong qpcPosition);
-        [PreserveSig] int ReleaseBuffer(uint numFramesRead);
-        [PreserveSig] int GetNextPacketSize(out uint numFramesInNextPacket);
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct WAVEFORMATEX
-    {
-        public ushort wFormatTag;
-        public ushort nChannels;
-        public uint nSamplesPerSec;
-        public uint nAvgBytesPerSec;
-        public ushort nBlockAlign;
-        public ushort wBitsPerSample;
-        public ushort cbSize;
     }
 }

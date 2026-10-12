@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using TaskbarMediaWidget.Interop;
 
 namespace TaskbarMediaWidget.Core;
 
@@ -225,89 +226,5 @@ internal sealed class CoreAudioVolumeService : IDisposable
     {
         _endpointVolume = null;
         _initialized = false;
-    }
-
-    // COM Interop definitions
-    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-    private class MMDeviceEnumeratorComObject { }
-
-    [ComImport, Guid("870af99c-171d-4f9e-af0d-e63df40c2bc9")]
-    private class PolicyConfigComObject { }
-
-    [Guid("f8679f50-850a-4129-9dc1-69e6386ac8fb"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IPolicyConfig
-    {
-        [PreserveSig] int GetMixFormat(string pszDeviceName, IntPtr ppFormat);
-        [PreserveSig] int GetDeviceFormat(string pszDeviceName, bool bDefault, IntPtr ppFormat);
-        [PreserveSig] int ResetDeviceFormat(string pszDeviceName);
-        [PreserveSig] int SetDeviceFormat(string pszDeviceName, IntPtr pEndpointFormat, IntPtr mixFormat);
-        [PreserveSig] int GetProcessingPeriod(string pszDeviceName, bool bDefault, IntPtr pmftDefaultPeriod, IntPtr pmftMinimumPeriod);
-        [PreserveSig] int SetProcessingPeriod(string pszDeviceName, IntPtr pmftPeriod);
-        [PreserveSig] int GetShareMode(string pszDeviceName, IntPtr pMode);
-        [PreserveSig] int SetShareMode(string pszDeviceName, IntPtr mode);
-        [PreserveSig] int GetPropertyValue(string pszDeviceName, bool bFxStore, IntPtr key, IntPtr pv);
-        [PreserveSig] int SetPropertyValue(string pszDeviceName, bool bFxStore, IntPtr key, IntPtr pv);
-        [PreserveSig] int SetDefaultEndpoint(string pszDeviceName, int role);
-        [PreserveSig] int SetEndpointVisibility(string pszDeviceName, bool bVisible);
-    }
-
-    [Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceCollection
-    {
-        [PreserveSig] int GetCount(out uint count);
-        [PreserveSig] int Item(uint index, out IMMDevice device);
-    }
-
-    [Guid("886D8EEB-8CF2-4446-8D02-C33284CD4D87"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IPropertyStore
-    {
-        [PreserveSig] int GetCount(out uint count);
-        [PreserveSig] int GetAt(uint index, out PropertyKey key);
-        [PreserveSig] int GetValue(ref PropertyKey key, out PropVariant value);
-        [PreserveSig] int SetValue(ref PropertyKey key, ref PropVariant value);
-        [PreserveSig] int Commit();
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PropertyKey
-    {
-        public Guid fmtid;
-        public uint pid;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    private struct PropVariant
-    {
-        [FieldOffset(0)] public short vt;
-        [FieldOffset(8)] public IntPtr ptrVal;
-    }
-
-    [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDeviceEnumerator
-    {
-        [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
-        [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
-    }
-
-    [Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IMMDevice
-    {
-        [PreserveSig] int Activate([In] ref Guid iid, int clsCtx, IntPtr activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object interfacePointer);
-        [PreserveSig] int OpenPropertyStore(int stgmAccess, out IntPtr properties);
-        [PreserveSig] int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
-    }
-
-    [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IAudioEndpointVolume
-    {
-        [PreserveSig] int RegisterControlChangeNotify(IntPtr client);
-        [PreserveSig] int UnregisterControlChangeNotify(IntPtr client);
-        [PreserveSig] int GetChannelCount(out int channelCount);
-        [PreserveSig] int SetMasterVolumeLevel(float levelDb, ref Guid eventContext);
-        [PreserveSig] int SetMasterVolumeLevelScalar(float level, ref Guid eventContext);
-        [PreserveSig] int GetMasterVolumeLevel(out float levelDb);
-        [PreserveSig] int GetMasterVolumeLevelScalar(out float level);
-        [PreserveSig] int SetMute([MarshalAs(UnmanagedType.Bool)] bool isMuted, ref Guid eventContext);
-        [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool isMuted);
     }
 }
